@@ -34,8 +34,8 @@
 #include <string>
 #include "heif_encoder_aom.h"
 
-#include <aom/aom_encoder.h>
-#include <aom/aomcx.h>
+#include "aom/aom_encoder.h"
+#include "aom/aomcx.h"
 
 // Detect whether the aom_codec_set_option() function is available.
 // See https://aomedia.googlesource.com/aom/+/c1d42fe6615c96fc929257ed53c41fa094f38836%5E%21/aom/aom_codec.h.
