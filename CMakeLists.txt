@@ -47,6 +47,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Create the compile command database for clang by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_BUILD_TYPE
+        "MinSizeRel"
+        CACHE STRING "Build type: Debug, Release, RelWithDebInfo or MinSizeRel"
+              FORCE)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 include(CheckCXXCompilerFlag)
@@ -89,13 +93,13 @@ macro(plugin_option variableName packageName displayName displayType defaultPlug
     unset(msg)
 endmacro()
 
-plugin_option(LIBDE265 LIBDE265 "libde265" "HEIC decoder" OFF)
-plugin_option(X265 X265 "x265" "HEIC encoder" OFF)
-plugin_option(DAV1D DAV1D "Dav1d" "AVIF decoder" OFF)
-plugin_option(AOM_ENCODER AOM "aom" "AVIF encoder" OFF)
+plugin_option(LIBDE265 LIBDE265 "libde265" "HEIC decoder" ON)
+plugin_option(X265 X265 "x265" "HEIC encoder" ON)
+plugin_option(DAV1D DAV1D "Dav1d" "AVIF decoder" ON)
+plugin_option(AOM_ENCODER AOM "aom" "AVIF encoder" ON)
 plugin_option(AOM_DECODER AOM "aom" "AVIF decoder" OFF)
-plugin_option(SvtEnc SvtEnc "Svt-av1" "AVIF encoder" ON)
-plugin_option(RAV1E RAV1E "Rav1e" "AVIF encoder" ON)
+plugin_option(SvtEnc SvtEnc "Svt-av1" "AVIF encoder" OFF)
+plugin_option(RAV1E RAV1E "Rav1e" "AVIF encoder" OFF)
 
 option(ENABLE_UNCOMPRESSED_DECODER "Support internal ISO/IEC 23001-17 uncompressed decoder (experimental)" OFF)
 option(ENABLE_UNCOMPRESSED_ENCODER "Support internal ISO/IEC 23001-17 uncompressed encoder (experimental)" OFF)
@@ -142,9 +146,9 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libheif.pc
 
 # ---
 
-option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_EXAMPLES "Build examples" OFF)
 
-option(WITH_DEFLATE_HEADER_COMPRESSION OFF)
+option(WITH_DEFLATE_HEADER_COMPRESSION ON)
 option(ENABLE_MULTITHREADING_SUPPORT "Switch off for platforms without multithreading support" ON)
 option(ENABLE_PARALLEL_TILE_DECODING "Will launch multiple decoders to decode tiles in parallel (requires ENABLE_MULTITHREADING_SUPPORT)" ON)
 
