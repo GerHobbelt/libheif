@@ -33,8 +33,8 @@
 #include <cassert>
 #include <cstdio>
 
-#include <dav1d/version.h>
-#include <dav1d/dav1d.h>
+#include "dav1d/version.h"
+#include "dav1d/dav1d.h"
 
 struct dav1d_decoder
 {
