@@ -694,8 +694,10 @@ InputImage loadPNG(const char* filename, int output_bit_depth)
   /* read rest of file, and get additional chunks in info_ptr - REQUIRED */
   png_read_end(png_ptr, info_ptr);
 
+
   // --- read EXIF data
 
+#ifdef PNG_eXIf_SUPPORTED
   png_bytep exifPtr = nullptr;
   png_uint_32 exifSize = 0;
   if (png_get_eXIf_1(png_ptr, info_ptr, &exifSize, &exifPtr) == PNG_INFO_eXIf) {
@@ -705,6 +707,7 @@ InputImage loadPNG(const char* filename, int output_bit_depth)
     // remove the EXIF orientation since it is informal only in PNG and we do not want to confuse with an orientation not matching irot/imir
     modify_exif_orientation_tag_if_it_exists(input_image.exif.data(), (int)input_image.exif.size(), 1);
   }
+#endif
 
   // --- read XMP data
 
@@ -1160,9 +1163,9 @@ static void show_list_of_encoders(const heif_encoder_descriptor* const* encoder_
 }
 
 
-static void show_list_of_all_encoders(heif_context* context)
+static void show_list_of_all_encoders()
 {
-  for (auto compression_format : {heif_compression_AV1, heif_compression_HEVC}) {
+  for (auto compression_format : {heif_compression_HEVC, heif_compression_AV1}) {
 
     switch (compression_format) {
       case heif_compression_AV1:
@@ -1179,10 +1182,9 @@ static void show_list_of_all_encoders(heif_context* context)
 
 #define MAX_ENCODERS 10
     const heif_encoder_descriptor* encoder_descriptors[MAX_ENCODERS];
-    int count = heif_context_get_encoder_descriptors(context,
-                                                     compression_format,
-                                                     nullptr,
-                                                     encoder_descriptors, MAX_ENCODERS);
+    int count = heif_get_encoder_descriptors(compression_format,
+                                             nullptr,
+                                             encoder_descriptors, MAX_ENCODERS);
 #undef MAX_ENCODERS
 
     show_list_of_encoders(encoder_descriptors, count);
@@ -1333,18 +1335,10 @@ int main(int argc, char** argv)
 
   // ==============================================================================
 
-  std::shared_ptr<heif_context> context(heif_context_alloc(),
-                                        [](heif_context* c) { heif_context_free(c); });
-  if (!context) {
-    std::cerr << "Could not create context object\n";
-    return 1;
-  }
-
-
   struct heif_encoder* encoder = nullptr;
 
   if (list_encoders) {
-    show_list_of_all_encoders(context.get());
+    show_list_of_all_encoders();
     return 0;
   }
 
@@ -1372,12 +1366,19 @@ int main(int argc, char** argv)
 
   // --- select encoder
 
+  std::shared_ptr<heif_context> context(heif_context_alloc(),
+                                        [](heif_context* c) { heif_context_free(c); });
+  if (!context) {
+    std::cerr << "Could not create context object\n";
+    return 1;
+  }
+
+
 #define MAX_ENCODERS 10
   const heif_encoder_descriptor* encoder_descriptors[MAX_ENCODERS];
-  int count = heif_context_get_encoder_descriptors(context.get(),
-                                                   compressionFormat,
-                                                   nullptr,
-                                                   encoder_descriptors, MAX_ENCODERS);
+  int count = heif_get_encoder_descriptors(compressionFormat,
+                                           nullptr,
+                                           encoder_descriptors, MAX_ENCODERS);
 #undef MAX_ENCODERS
 
   const heif_encoder_descriptor* active_encoder_descriptor = nullptr;
