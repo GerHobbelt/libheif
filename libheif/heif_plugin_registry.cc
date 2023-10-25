@@ -61,6 +61,9 @@
 #include "libheif/plugins/heif_encoder_svt.h"
 #endif
 
+#if HAVE_OPENJPEG
+#include "libheif/plugins/heif_encoder_openjpeg.h"
+#endif
 
 using namespace heif;
 
@@ -110,6 +113,10 @@ void heif::register_default_plugins()
 
 #if HAVE_SvtEnc
   heif::register_encoder(get_encoder_plugin_svt());
+#endif
+
+#if HAVE_OPENJPEG
+  heif::register_encoder(get_encoder_plugin_openjpeg());
 #endif
 
 #if ENABLE_UNCOMPRESSED_ENCODER

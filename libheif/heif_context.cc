@@ -2083,6 +2083,14 @@ Error HeifContext::encode_image(const std::shared_ptr<HeifPixelImage>& pixel_ima
                                   out_image);
     }
       break;
+    case heif_compression_JPEG2000: {
+      error = encode_image_as_jpeg2000(pixel_image,
+                                       encoder,
+                                       options,
+                                       heif_image_input_class_normal,
+                                       out_image);
+      }
+      break;
 
     case heif_compression_uncompressed: {
       error = encode_image_as_uncompressed(pixel_image,
@@ -2581,6 +2589,61 @@ Error HeifContext::encode_image_as_av1(const std::shared_ptr<HeifPixelImage>& im
   return Error::Ok;
 }
 
+Error HeifContext::encode_image_as_jpeg2000(const std::shared_ptr<HeifPixelImage>& image,
+                                            struct heif_encoder* encoder,
+                                            const struct heif_encoding_options* options,
+                                            enum heif_image_input_class input_class,
+                                            std::shared_ptr<Image>& out_image) {
+
+  heif_item_id image_id = m_heif_file->add_new_image("j2k1");
+
+  out_image = std::make_shared<Image>(this, image_id);
+  m_top_level_images.push_back(out_image);
+
+  //Encode Image
+  std::shared_ptr<HeifPixelImage> src_image = image;
+  heif_image c_api_image;
+  c_api_image.image = src_image;
+  encoder->plugin->encode_image(encoder->encoder, &c_api_image, input_class);
+
+  //Get Compressed Data
+  for (;;) {
+    uint8_t* data;
+    int size;
+    
+    if (data == NULL) {
+      break;
+    }
+
+    encoder->plugin->get_compressed_data(encoder->encoder, &data, &size, nullptr);
+    std::vector<uint8_t> vec;
+    vec.resize(size);
+    memcpy(vec.data(), data, size);
+
+    m_heif_file->append_iloc_data(image_id, vec);
+  }
+
+
+
+  //Add 'ispe' Property 
+  m_heif_file->add_ispe_property(image_id, image->get_width(), image->get_height());
+
+  //Add 'colr' Property
+  //TODO: Use the correct color profile instead of default
+  auto profile = std::make_shared<const color_profile_nclx>();
+  m_heif_file->set_color_profile(image_id, profile);
+
+  //Add 'j2kH' Property
+  auto j2kH = m_heif_file->add_j2kH_property(image_id);
+
+  //Add 'cdef' to 'j2kH'
+  auto cdef = std::make_shared<Box_cdef>();
+  cdef->set_channels(image->get_chroma_format());
+  j2kH->append_child_box(cdef);
+
+  return Error::Ok;
+  
+}
 
 Error HeifContext::encode_image_as_uncompressed(const std::shared_ptr<HeifPixelImage>& src_image,
                                                 struct heif_encoder* encoder,
