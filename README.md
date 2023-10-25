@@ -219,7 +219,7 @@ You can also add plugin directories programmatically.
 
 ## Encoder benchmark
 
-A current benchmark of the AVIF encoders (as of 14 Oct 2022) can be found in the Wiki page
+A current benchmark of the AVIF encoders (as of 14 Oct 2022) can be found on the Wiki page
 [AVIF encoding benchmark](https://github.com/strukturag/libheif/wiki/AVIF-Encoder-Benchmark).
 
 
@@ -293,6 +293,7 @@ to update the gdk-pixbuf loader database.
 * [GIMP](https://www.gimp.org/)
 * [Krita](https://krita.org)
 * [ImageMagick](https://imagemagick.org/)
+* [GraphicsMagick](http://www.graphicsmagick.org/)
 * [darktable](https://www.darktable.org)
 * [digiKam 7.0.0](https://www.digikam.org/)
 * [libvips](https://github.com/libvips/libvips)
@@ -321,5 +322,5 @@ The sample applications are distributed under the terms of the MIT License.
 See COPYING for more details.
 
 Copyright (c) 2017-2020 Struktur AG</br>
-Copyright (c) 2017-2022 Dirk Farin</br>
+Copyright (c) 2017-2023 Dirk Farin</br>
 Contact: Dirk Farin <dirk.farin@gmail.com>
