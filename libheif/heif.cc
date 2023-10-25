@@ -81,19 +81,24 @@ uint32_t heif_get_version_number(void)
   return (LIBHEIF_NUMERIC_VERSION);
 }
 
+static uint8_t bcd2dec(uint8_t v)
+{
+  return uint8_t((v>>4) * 10 + (v & 0x0F));
+}
+
 int heif_get_version_number_major(void)
 {
-  return ((LIBHEIF_NUMERIC_VERSION) >> 24) & 0xFF;
+  return bcd2dec(((LIBHEIF_NUMERIC_VERSION) >> 24) & 0xFF);
 }
 
 int heif_get_version_number_minor(void)
 {
-  return ((LIBHEIF_NUMERIC_VERSION) >> 16) & 0xFF;
+  return bcd2dec(((LIBHEIF_NUMERIC_VERSION) >> 16) & 0xFF);
 }
 
 int heif_get_version_number_maintenance(void)
 {
-  return ((LIBHEIF_NUMERIC_VERSION) >> 8) & 0xFF;
+  return bcd2dec(((LIBHEIF_NUMERIC_VERSION) >> 8) & 0xFF);
 }
 
 
@@ -200,6 +205,9 @@ heif_brand heif_fourcc_to_brand_enum(const char* fourcc)
   }
   else if (strcmp(brand, "avis") == 0) {
     return heif_avis;
+  }
+  else if (strcmp(brand, "vvic") == 0) {
+    return heif_vvic;
   }
   else {
     return heif_unknown_brand;
@@ -1000,6 +1008,111 @@ void heif_image_add_decoding_warning(struct heif_image* image,
 }
 
 
+int heif_image_has_content_light_level(const struct heif_image* image)
+{
+  return image->image->has_clli();
+}
+
+void heif_image_get_content_light_level(const struct heif_image* image, struct heif_content_light_level* out)
+{
+  if (out) {
+    *out = image->image->get_clli();
+  }
+}
+
+void heif_image_set_content_light_level(const struct heif_image* image, const struct heif_content_light_level* in)
+{
+  if (in==nullptr) {
+    return;
+  }
+
+  image->image->set_clli(*in);
+}
+
+
+int heif_image_has_mastering_display_colour_volume(const struct heif_image* image)
+{
+  return image->image->has_mdcv();
+}
+
+void heif_image_get_mastering_display_colour_volume(const struct heif_image* image, struct heif_mastering_display_colour_volume* out)
+{
+  *out = image->image->get_mdcv();
+}
+
+void heif_image_set_mastering_display_colour_volume(const struct heif_image* image, const struct heif_mastering_display_colour_volume* in)
+{
+  if (in==nullptr) {
+    return;
+  }
+
+  image->image->set_mdcv(*in);
+}
+
+float mdcv_coord_decode_x(uint16_t coord)
+{
+  // check for unspecified value
+  if (coord<5 || coord>37000) {
+    return 0.0f;
+  }
+
+  return (float)(coord * 0.00002);
+}
+
+float mdcv_coord_decode_y(uint16_t coord)
+{
+  // check for unspecified value
+  if (coord<5 || coord>42000) {
+    return 0.0f;
+  }
+
+  return (float)(coord * 0.00002);
+}
+
+struct heif_error heif_mastering_display_colour_volume_decode(const struct heif_mastering_display_colour_volume* in,
+                                                              struct heif_decoded_mastering_display_colour_volume* out)
+{
+  if (in==nullptr || out==nullptr) {
+    return error_null_parameter;
+  }
+
+  for (int c=0;c<3;c++) {
+    out->display_primaries_x[c] = mdcv_coord_decode_x(in->display_primaries_x[c]);
+    out->display_primaries_y[c] = mdcv_coord_decode_y(in->display_primaries_y[c]);
+  }
+
+  out->white_point_x = mdcv_coord_decode_x(in->white_point_x);
+  out->white_point_y = mdcv_coord_decode_y(in->white_point_y);
+
+  if (in->max_display_mastering_luminance < 50000 || in->max_display_mastering_luminance > 100000000) {
+    out->max_display_mastering_luminance = 0;
+  }
+  else {
+    out->max_display_mastering_luminance = in->max_display_mastering_luminance * 0.0001;
+  }
+
+  if (in->min_display_mastering_luminance < 1 || in->min_display_mastering_luminance > 50000) {
+    out->min_display_mastering_luminance = 0;
+  }
+  else {
+    out->min_display_mastering_luminance = in->min_display_mastering_luminance * 0.0001;
+  }
+
+  return error_Ok;
+}
+
+
+void heif_image_get_pixel_aspect_ratio(const struct heif_image* image, uint32_t* aspect_h, uint32_t* aspect_v)
+{
+  image->image->get_pixel_ratio(aspect_h, aspect_v);
+}
+
+void heif_image_set_pixel_aspect_ratio(struct heif_image* image, uint32_t aspect_h, uint32_t aspect_v)
+{
+  image->image->set_pixel_ratio(aspect_h, aspect_v);
+}
+
+
 void heif_image_release(const struct heif_image* img)
 {
   delete img;
@@ -1789,7 +1902,7 @@ int heif_get_decoder_descriptors(enum heif_compression_format format_filter,
   std::vector<decoder_with_priority> plugins;
   std::vector<heif_compression_format> formats;
   if (format_filter == heif_compression_undefined) {
-    formats = { heif_compression_HEVC, heif_compression_AV1 };
+    formats = { heif_compression_HEVC, heif_compression_AV1, heif_compression_VVC };
   }
   else {
     formats.emplace_back(format_filter);
