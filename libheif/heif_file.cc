@@ -19,13 +19,16 @@
  */
 
 #include "heif_file.h"
+#include "libheif/box.h"
 
+#include <cstdint>
 #include <fstream>
 #include <limits>
 #include <sstream>
 #include <utility>
 #include <cstring>
 #include <cassert>
+#include <algorithm>
 
 #if defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)
 
@@ -37,6 +40,10 @@
 #endif
 
 #include "metadata_compression.h"
+
+#ifdef ENABLE_UNCOMPRESSED_DECODER
+#include "uncompressed_image.h"
+#endif
 
 using namespace heif;
 
@@ -485,6 +492,15 @@ int HeifFile::get_luma_bits_per_pixel_from_configuration(heif_item_id imageID) c
       }
     }
   }
+
+#ifdef ENABLE_UNCOMPRESSED_DECODER
+  // Uncompressed
+
+  if (image_type == "unci") {
+    int bpp = UncompressedImageDecoder::get_luma_bits_per_pixel_from_configuration_unci(*this, imageID);
+    return bpp;
+  }
+#endif
 
   return -1;
 }

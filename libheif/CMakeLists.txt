@@ -95,6 +95,13 @@ if (ENABLE_MULTITHREADING_SUPPORT)
     endif()
 endif()
 
+if (ENABLE_UNCOMPRESSED_DECODER)
+    target_compile_definitions(heif PRIVATE ENABLE_UNCOMPRESSED_DECODER=1)
+    target_sources(heif PRIVATE
+            uncompressed_image.h
+            uncompressed_image.cc)
+endif()
+
 write_basic_package_version_file(${PROJECT_NAME}-config-version.cmake COMPATIBILITY ExactVersion)
 
 install(TARGETS heif EXPORT ${PROJECT_NAME}-config
