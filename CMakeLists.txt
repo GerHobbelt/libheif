@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0)
 
-project(libheif LANGUAGES C CXX VERSION 1.16.0)
+project(libheif LANGUAGES C CXX VERSION 1.16.1)
 
 # https://cmake.org/cmake/help/v3.1/policy/CMP0054.html
 cmake_policy(VERSION 3.0...3.22)
@@ -239,6 +239,7 @@ add_subdirectory (gnome)
 
 set(CPACK_VERBATIM_VARIABLES YES)
 set(CPACK_SOURCE_GENERATOR TGZ)
+set(CPACK_SOURCE_PACKAGE_FILE_NAME libheif-${PACKAGE_VERSION})
 set(CPACK_SOURCE_IGNORE_FILES
 /.git/
 /.github/
