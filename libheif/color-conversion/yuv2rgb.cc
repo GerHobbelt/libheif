@@ -39,6 +39,9 @@ Op_YCbCr_to_RGB<Pixel>::state_after_conversion(const ColorState& input_state,
       return {};
     }
   }
+  if (input_state.chroma == heif_chroma_monochrome) {
+    return {};
+  }
 
   bool hdr = !std::is_same<Pixel, uint8_t>::value;
 
@@ -610,7 +613,7 @@ Op_YCbCr420_to_RRGGBBaa::convert_colorspace(const std::shared_ptr<const HeifPixe
       }
 
       int r = clip_f_u16(y_ + coeffs.r_cr * cr, maxval);
-      int g = clip_f_u16(y_ + coeffs.g_cb * cb - coeffs.g_cr * cr, maxval);
+      int g = clip_f_u16(y_ + coeffs.g_cb * cb + coeffs.g_cr * cr, maxval);
       int b = clip_f_u16(y_ + coeffs.b_cb * cb, maxval);
 
       out_p[y * out_p_stride + bytesPerPixel * x + 0 + le] = (uint8_t) (r >> 8);
