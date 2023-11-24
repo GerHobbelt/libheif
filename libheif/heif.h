@@ -442,7 +442,8 @@ typedef uint32_t heif_brand2;
 #define heif_brand2_vvis   heif_fourcc('v','v','i','s') // VVC sequence
 #define heif_brand2_evbi   heif_fourcc('e','v','b','i') // EVC image
 #define heif_brand2_evbs   heif_fourcc('e','v','b','s') // EVC sequence
-
+#define heif_brand2_jpeg   heif_fourcc('j','p','e','g') // JPEG, per ISO/IEC 23008-12 Annex H.4
+#define heif_brand2_jpgs   heif_fourcc('j','p','g','s') // JPEG sequence, per ISO/IEC 23008-12 Annex H.5
 
 // input data should be at least 12 bytes
 LIBHEIF_API
@@ -600,7 +601,7 @@ LIBHEIF_API
 struct heif_error heif_context_get_primary_image_handle(struct heif_context* ctx,
                                                         struct heif_image_handle**);
 
-// Get the handle for a specific top-level image from an image ID.
+// Get the image handle for a known image ID.
 LIBHEIF_API
 struct heif_error heif_context_get_image_handle(struct heif_context* ctx,
                                                 heif_item_id id,

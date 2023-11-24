@@ -133,6 +133,9 @@ heif_filetype_result heif_check_filetype(const uint8_t* data, int len)
     else if (brand == heif_brand2_avif) {
       return heif_filetype_yes_supported;
     }
+    else if (brand == heif_brand2_jpeg) {
+      return heif_filetype_yes_supported;
+    }
     else if (brand == heif_brand2_mif1) {
       return heif_filetype_maybe;
     }
@@ -580,15 +583,7 @@ struct heif_error heif_context_get_image_handle(struct heif_context* ctx,
     return err.error_struct(ctx->context.get());
   }
 
-  const std::vector<std::shared_ptr<HeifContext::Image>> images = ctx->context->get_top_level_images();
-
-  std::shared_ptr<HeifContext::Image> image;
-  for (auto& img : images) {
-    if (img->get_id() == id) {
-      image = img;
-      break;
-    }
-  }
+  auto image = ctx->context->get_image(id);
 
   if (!image) {
     Error err(heif_error_Usage_error, heif_suberror_Nonexisting_item_referenced);
