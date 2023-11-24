@@ -29,43 +29,35 @@
 #include "plugin_registry.h"
 
 #if HAVE_LIBDE265
-
-#include "libheif/plugins/heif_decoder_libde265.h"
-
+#include "libheif/plugins/decoder_libde265.h"
 #endif
 
 #if HAVE_X265
-
-#include "libheif/plugins/heif_encoder_x265.h"
-
+#include "libheif/plugins/encoder_x265.h"
 #endif
 
 #if HAVE_AOM_ENCODER
-
-#include "libheif/plugins/heif_encoder_aom.h"
-
+#include "libheif/plugins/encoder_aom.h"
 #endif
 
 #if HAVE_AOM_DECODER
-
-#include "libheif/plugins/heif_decoder_aom.h"
-
+#include "libheif/plugins/decoder_aom.h"
 #endif
 
 #if HAVE_RAV1E
-
-#include "libheif/plugins/heif_encoder_rav1e.h"
-
+#include "libheif/plugins/encoder_rav1e.h"
 #endif
 
 #if HAVE_DAV1D
-#include "libheif/plugins/heif_decoder_dav1d.h"
+#include "libheif/plugins/decoder_dav1d.h"
 #endif
 
 #if HAVE_SvtEnc
+#include "libheif/plugins/encoder_svt.h"
+#endif
 
-#include "libheif/plugins/heif_encoder_svt.h"
-
+#if WITH_UNCOMPRESSED_CODEC
+#include "libheif/plugins/encoder_uncompressed.h"
 #endif
 
 #if HAVE_OPENJPEG
@@ -121,6 +113,10 @@ void register_default_plugins()
 
 #if HAVE_OPENJPEG
   heif::register_encoder(get_encoder_plugin_openjpeg());
+#endif
+
+#if WITH_UNCOMPRESSED_CODEC
+  register_encoder(get_encoder_plugin_uncompressed());
 #endif
 }
 
