@@ -73,6 +73,7 @@ Op_YCbCr_to_RGB<Pixel>::state_after_conversion(const ColorState& input_state,
 template<class Pixel>
 std::shared_ptr<HeifPixelImage>
 Op_YCbCr_to_RGB<Pixel>::convert_colorspace(const std::shared_ptr<const HeifPixelImage>& input,
+                                           const ColorState& input_state,
                                            const ColorState& target_state,
                                            const heif_color_conversion_options& options) const
 {
@@ -270,14 +271,12 @@ Op_YCbCr420_to_RGB24::state_after_conversion(const ColorState& input_state,
     return {};
   }
 
-  if (input_state.nclx_profile) {
-    int matrix = input_state.nclx_profile->get_matrix_coefficients();
-    if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
-      return {};
-    }
-    if (!input_state.nclx_profile->get_full_range_flag()) {
-      return {};
-    }
+  int matrix = input_state.nclx_profile.get_matrix_coefficients();
+  if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
+    return {};
+  }
+  if (!input_state.nclx_profile.get_full_range_flag()) {
+    return {};
   }
 
   std::vector<ColorStateWithCost> states;
@@ -299,6 +298,7 @@ Op_YCbCr420_to_RGB24::state_after_conversion(const ColorState& input_state,
 
 std::shared_ptr<HeifPixelImage>
 Op_YCbCr420_to_RGB24::convert_colorspace(const std::shared_ptr<const HeifPixelImage>& input,
+                                         const ColorState& input_state,
                                          const ColorState& target_state,
                                          const heif_color_conversion_options& options) const
 {
@@ -381,14 +381,12 @@ Op_YCbCr420_to_RGB32::state_after_conversion(const ColorState& input_state,
     return {};
   }
 
-  if (input_state.nclx_profile) {
-    int matrix = input_state.nclx_profile->get_matrix_coefficients();
-    if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
-      return {};
-    }
-    if (!input_state.nclx_profile->get_full_range_flag()) {
-      return {};
-    }
+  int matrix = input_state.nclx_profile.get_matrix_coefficients();
+  if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
+    return {};
+  }
+  if (!input_state.nclx_profile.get_full_range_flag()) {
+    return {};
   }
 
   std::vector<ColorStateWithCost> states;
@@ -410,6 +408,7 @@ Op_YCbCr420_to_RGB32::state_after_conversion(const ColorState& input_state,
 
 std::shared_ptr<HeifPixelImage>
 Op_YCbCr420_to_RGB32::convert_colorspace(const std::shared_ptr<const HeifPixelImage>& input,
+                                         const ColorState& input_state,
                                          const ColorState& target_state,
                                          const heif_color_conversion_options& options) const
 {
@@ -509,11 +508,9 @@ Op_YCbCr420_to_RRGGBBaa::state_after_conversion(const ColorState& input_state,
     return {};
   }
 
-  if (input_state.nclx_profile) {
-    int matrix = input_state.nclx_profile->get_matrix_coefficients();
-    if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
-      return {};
-    }
+  int matrix = input_state.nclx_profile.get_matrix_coefficients();
+  if (matrix == 0 || matrix == 8 || matrix == 11 || matrix == 14) {
+    return {};
   }
 
   std::vector<ColorStateWithCost> states;
@@ -545,6 +542,7 @@ Op_YCbCr420_to_RRGGBBaa::state_after_conversion(const ColorState& input_state,
 
 std::shared_ptr<HeifPixelImage>
 Op_YCbCr420_to_RRGGBBaa::convert_colorspace(const std::shared_ptr<const HeifPixelImage>& input,
+                                            const ColorState& input_state,
                                             const ColorState& target_state,
                                             const heif_color_conversion_options& options) const
 {
