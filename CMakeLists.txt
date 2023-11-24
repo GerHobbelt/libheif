@@ -169,6 +169,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libheif.pc
 # ---
 
 option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_GDKPIXBUF "Build gdk-pixbuf plugin" ON)
 
 option(WITH_REDUCED_VISIBILITY "Reduced symbol visibility in library" ON)
 
@@ -223,7 +224,11 @@ if (CMAKE_CXX_COMPILER MATCHES "clang\\+\\+$")
 endif()
 
 add_subdirectory (libheif)
-add_subdirectory (gdk-pixbuf)
+
+if (WITH_GDK_PIXBUF)
+  add_subdirectory (gdk-pixbuf)
+endif()
+
 add_subdirectory (gnome)
 
 
