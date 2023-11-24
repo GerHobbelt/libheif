@@ -1006,7 +1006,7 @@ Error Box_iloc::parse(BitstreamRange& range)
     index_size = (values4 & 0xF);
   }
 
-  int item_count;
+  uint32_t item_count;
   if (get_version() < 2) {
     item_count = range.read16();
   }
@@ -1025,7 +1025,7 @@ Error Box_iloc::parse(BitstreamRange& range)
                  sstr.str());
   }
 
-  for (int i = 0; i < item_count; i++) {
+  for (uint32_t i = 0; i < item_count; i++) {
     Item item;
 
     if (get_version() < 2) {
@@ -1646,7 +1646,7 @@ Error Box_iinf::parse(BitstreamRange& range)
 
   int nEntries_size = (get_version() > 0) ? 4 : 2;
 
-  int item_count;
+  uint32_t item_count;
   if (nEntries_size == 2) {
     item_count = range.read16();
   }
@@ -2374,8 +2374,8 @@ Error Box_ipma::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
-  int entry_cnt = range.read32();
-  for (int i = 0; i < entry_cnt && !range.error() && !range.eof(); i++) {
+  uint32_t entry_cnt = range.read32();
+  for (uint32_t i = 0; i < entry_cnt && !range.error() && !range.eof(); i++) {
     Entry entry;
     if (get_version() < 1) {
       entry.item_ID = range.read16();
@@ -3569,8 +3569,8 @@ Error Box_grpl::parse(BitstreamRange& range)
     }
 
     group.group_id = range.read32();
-    int nEntities = range.read32();
-    for (int i = 0; i < nEntities; i++) {
+    uint32_t nEntities = range.read32();
+    for (uint32_t i = 0; i < nEntities; i++) {
       if (range.eof()) {
         break;
       }
@@ -3628,7 +3628,7 @@ Error Box_dref::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
-  int nEntities = range.read32();
+  uint32_t nEntities = range.read32();
 
   /*
   for (int i=0;i<nEntities;i++) {
@@ -3638,12 +3638,18 @@ Error Box_dref::parse(BitstreamRange& range)
   }
   */
 
-  Error err = read_children(range, nEntities);
+  if (nEntities > std::numeric_limits<int>::max()) {
+    return Error(heif_error_Memory_allocation_error,
+                 heif_suberror_Security_limit_exceeded,
+                 "Too many entities in dref box.");
+  }
+
+  Error err = read_children(range, (int)nEntities);
   if (err) {
     return err;
   }
 
-  if ((int) m_children.size() != nEntities) {
+  if (m_children.size() != nEntities) {
     // TODO return Error(
   }
 
