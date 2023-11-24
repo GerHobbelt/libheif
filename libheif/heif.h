@@ -64,7 +64,7 @@ extern "C" {
 #define LIBHEIF_API
 #endif
 
-#define heif_fourcc(a, b, c, d) ((a<<24) | (b<<16) | (c<<8) | d)
+#define heif_fourcc(a, b, c, d) ((uint32_t)((a<<24) | (b<<16) | (c<<8) | d))
 
 
 /* === version numbers === */
@@ -396,7 +396,7 @@ LIBHEIF_API
 int heif_check_jpeg_filetype(const uint8_t* data, int len);
 
 
-// DEPRECATED, use heif_brand2 instead
+// DEPRECATED, use heif_brand2 and the heif_brand2_* constants below instead
 enum heif_brand
 {
   heif_unknown_brand,
@@ -424,6 +424,24 @@ enum heif_brand heif_main_brand(const uint8_t* data, int len);
 
 
 typedef uint32_t heif_brand2;
+
+#define heif_brand2_heic   heif_fourcc('h','e','i','c') // HEIF image with h265
+#define heif_brand2_heix   heif_fourcc('h','e','i','x') // 10bit images, or anything that uses h265 with range extension
+#define heif_brand2_hevc   heif_fourcc('h','e','v','c') // image sequences
+#define heif_brand2_hevx   heif_fourcc('h','e','v','x') // HDR image sequence
+#define heif_brand2_heim   heif_fourcc('h','e','i','m') // multiview
+#define heif_brand2_heis   heif_fourcc('h','e','i','s') // scalable
+#define heif_brand2_hevm   heif_fourcc('h','e','v','m') // multiview sequence
+#define heif_brand2_hevs   heif_fourcc('h','e','v','s') // scalable sequence
+#define heif_brand2_avif   heif_fourcc('a','v','i','f') // AVIF image (AV1)
+#define heif_brand2_avis   heif_fourcc('a','v','i','s') // AVIF sequence
+#define heif_brand2_mif1   heif_fourcc('m','i','f','1') // image, any coding algorithm
+#define heif_brand2_msf1   heif_fourcc('m','s','f','1') // sequence, any coding algorithm
+#define heif_brand2_vvic   heif_fourcc('v','v','i','c') // VVC image
+#define heif_brand2_vvis   heif_fourcc('v','v','i','s') // VVC sequence
+#define heif_brand2_evbi   heif_fourcc('e','v','b','i') // EVC image
+#define heif_brand2_evbs   heif_fourcc('e','v','b','s') // EVC sequence
+
 
 // input data should be at least 12 bytes
 LIBHEIF_API
@@ -459,6 +477,8 @@ void heif_free_list_of_compatible_brands(heif_brand2* brands_list);
 // - image/heif           HEIF file using any other compression
 // - image/heic-sequence  HEIF image sequence using h265 compression
 // - image/heif-sequence  HEIF image sequence using any other compression
+// - image/avif           AVIF image
+// - image/avif-sequence  AVIF sequence
 // - image/jpeg    JPEG image
 // - image/png     PNG image
 // If the format could not be detected, an empty string is returned.
@@ -755,11 +775,16 @@ int heif_image_handle_get_list_of_auxiliary_image_IDs(const struct heif_image_ha
                                                       int aux_filter,
                                                       heif_item_id* ids, int count);
 
-// You are responsible to deallocate the returned buffer with heif_image_handle_free_auxiliary_types().
+// You are responsible to deallocate the returned buffer with heif_image_handle_release_auxiliary_type().
 LIBHEIF_API
 struct heif_error heif_image_handle_get_auxiliary_type(const struct heif_image_handle* handle,
                                                        const char** out_type);
 
+LIBHEIF_API
+void heif_image_handle_release_auxiliary_type(const struct heif_image_handle* handle,
+                                              const char** out_type);
+
+// DEPRECATED (because typo in function name). Use heif_image_handle_release_auxiliary_type() instead.
 LIBHEIF_API
 void heif_image_handle_free_auxiliary_types(const struct heif_image_handle* handle,
                                             const char** out_type);
@@ -971,6 +996,29 @@ enum heif_item_property_type
   heif_item_property_type_image_size = heif_fourcc('i', 's', 'p', 'e')
 };
 
+// Get the heif_property_id for a heif_item_id.
+// You may specify which property 'type' you want to receive.
+// If you specify 'heif_item_property_type_invalid', all properties associated to that item are returned.
+LIBHEIF_API
+int heif_item_get_properties_of_type(const struct heif_context* context,
+                                     heif_item_id id,
+                                     enum heif_item_property_type type,
+                                     heif_property_id* out_list,
+                                     int count);
+
+// Returns all transformative properties in the correct order.
+// This includes "irot", "imir", "clap".
+LIBHEIF_API
+int heif_item_get_transformation_properties(const struct heif_context* context,
+                                            heif_item_id id,
+                                            heif_property_id* out_list,
+                                            int count);
+
+LIBHEIF_API
+enum heif_item_property_type heif_item_get_property_type(const struct heif_context* context,
+                                                         heif_item_id id,
+                                                         heif_property_id property_id);
+
 // The strings are managed by libheif. They will be deleted in heif_property_user_description_release().
 struct heif_property_user_description
 {
@@ -984,35 +1032,21 @@ struct heif_property_user_description
   const char* tags;
 };
 
+// Get the "udes" user description property content.
+// Undefined strings are returned as empty strings.
 LIBHEIF_API
 struct heif_error heif_item_get_property_user_description(const struct heif_context* context,
                                                           heif_item_id itemId,
                                                           heif_property_id propertyId,
                                                           struct heif_property_user_description** out);
 
+// Add a "udes" user description property to the item.
+// If any string pointers are NULL, an empty string will be used instead.
 LIBHEIF_API
-struct heif_error heif_item_set_property_user_description(const struct heif_context* context,
+struct heif_error heif_item_add_property_user_description(const struct heif_context* context,
                                                           heif_item_id itemId,
                                                           const struct heif_property_user_description* description,
                                                           heif_property_id* out_propertyId);
-
-LIBHEIF_API
-int heif_item_get_properties_of_type(const struct heif_context* context,
-                                     heif_item_id id,
-                                     enum heif_item_property_type type,
-                                     heif_property_id* out_list,
-                                     int count);
-
-LIBHEIF_API
-int heif_item_get_transformation_properties(const struct heif_context* context,
-                                            heif_item_id id,
-                                            heif_property_id* out_list,
-                                            int count);
-
-LIBHEIF_API
-enum heif_item_property_type heif_item_get_property_type(const struct heif_context* context,
-                                                         heif_item_id id,
-                                                         heif_property_id property_id);
 
 enum heif_transform_mirror_direction
 {

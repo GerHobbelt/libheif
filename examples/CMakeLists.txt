@@ -40,9 +40,6 @@ add_executable(heif-enc ${getopt_sources}
         decoder_y4m.cc
         decoder_y4m.h)
 target_link_libraries(heif-enc PRIVATE heif)
-if (LIBSHARPYUV_FOUND)
-    target_compile_definitions(heif-enc PRIVATE HAVE_LIBSHARPYUV=1)
-endif()
 
 install(TARGETS heif-enc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES heif-enc.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
@@ -134,8 +131,3 @@ if (PNG_FOUND)
     install(TARGETS heif-thumbnailer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES heif-thumbnailer.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif ()
-
-if (WITH_UNCOMPRESSED_CODEC)
-    target_compile_definitions(heif-enc PRIVATE ENABLE_UNCOMPRESSED_ENCODER=1)
-    target_compile_definitions(heif-convert PRIVATE ENABLE_UNCOMPRESSED_ENCODER=1)
-endif()

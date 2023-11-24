@@ -108,7 +108,7 @@ static struct option long_options[] = {
     {(char* const) "bit-depth",               required_argument, 0,              'b'},
     {(char* const) "even-size",               no_argument,       0,              'E'},
     {(char* const) "avif",                    no_argument,       0,              'A'},
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if false && WITH_UNCOMPRESSED_CODEC
     {(char* const) "uncompressed",                no_argument,       0,                     'U'},
 #endif
     {(char* const) "matrix_coefficients",     required_argument, 0,              OPTION_NCLX_MATRIX_COEFFICIENTS},
@@ -121,9 +121,7 @@ static struct option long_options[] = {
     {(char* const) "benchmark",               no_argument,       &run_benchmark,  1},
     {(char* const) "enable-metadata-compression", no_argument,       &metadata_compression,  1},
     {(char* const) "pitm-description",            required_argument, 0,                     OPTION_PITM_DESCRIPTION},
-#if HAVE_LIBSHARPYUV
     {(char* const) "chroma-downsampling", required_argument, 0, 'C'},
-#endif
     {0, 0,                                                       0,               0},
 };
 
@@ -153,7 +151,7 @@ void show_help(const char* argv0)
             << "  -b, --bit-depth #     bit-depth of generated HEIF/AVIF file when using 16-bit PNG input (default: 10 bit)\n"
             << "  -p                    set encoder parameter (NAME=VALUE)\n"
             << "  -A, --avif            encode as AVIF (not needed if output filename with .avif suffix is provided)\n"
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if false && WITH_UNCOMPRESSED_CODEC
             << "  -U, --uncompressed    encode as uncompressed image (according to ISO 23001-17) (EXPERIMENTAL)\n"
 #endif
             << "      --list-encoders         list all available encoders for all compression formats\n"
@@ -167,10 +165,8 @@ void show_help(const char* argv0)
             << "  --enable-two-colr-boxes   will write both an ICC and an nclx color profile if both are present\n"
             << "  --premultiplied-alpha     input image has premultiplied alpha\n"
             << "  --enable-metadata-compression   enable XMP metadata compression (experimental)\n"
-#ifdef HAVE_LIBSHARPYUV
             << "  -C,--chroma-downsampling ALGO   force chroma downsampling algorithm (nn = nearest-neighbor / average / sharp-yuv)\n"
             << "                                  (sharp-yuv makes edges look sharper when using YUV420 with bilinear chroma upsampling)\n"
-#endif
             << "  --benchmark               measure encoding time, PSNR, and output file size\n"
             << "  --pitm-description TEXT   (EXPERIMENTAL) set user description for primary image\n"
 
@@ -371,10 +367,12 @@ static void show_list_of_all_encoders()
     show_list_of_encoders(encoder_descriptors, count);
   }
 
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if 0
+#if WITH_UNCOMPRESSED_CODEC
   std::cout << "uncompressed: yes\n";
 #else
   std::cout << "uncompressed: no\n";
+#endif
 #endif
 }
 
@@ -438,7 +436,7 @@ int main(int argc, char** argv)
   while (true) {
     int option_index = 0;
     int c = getopt_long(argc, argv, "hq:Lo:vPp:t:b:AEe:C:"
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if false && WITH_UNCOMPRESSED_CODEC
         "U"
 #endif
         , long_options, &option_index);
@@ -476,7 +474,7 @@ int main(int argc, char** argv)
       case 'A':
         force_enc_av1f = true;
         break;
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if false && WITH_UNCOMPRESSED_CODEC
         case 'U':
         force_enc_uncompressed = true;
         break;
@@ -528,6 +526,12 @@ int main(int argc, char** argv)
         if (chroma_downsampling == "nn") { // abbreviation
           chroma_downsampling = "nearest-neighbor";
         }
+#if !HAVE_LIBSHARPYUV
+        if (chroma_downsampling == "sharp-yuv") {
+          std::cerr << "Error: sharp-yuv chroma downsampling method has not been compiled into libheif.\n";
+          return 5;
+        }
+#endif
         break;
     }
   }
@@ -867,11 +871,11 @@ int main(int argc, char** argv)
     heif_item_id pitm_id = heif_image_handle_get_item_id(primary_image_handle);
 
     heif_property_user_description udes;
-    udes.lang = "";
-    udes.name = "";
-    udes.tags = "";
+    udes.lang = nullptr;
+    udes.name = nullptr;
+    udes.tags = nullptr;
     udes.description = property_pitm_description.c_str();
-    err = heif_item_set_property_user_description(context.get(), pitm_id, &udes, nullptr);
+    err = heif_item_add_property_user_description(context.get(), pitm_id, &udes, nullptr);
     if (err.code) {
       std::cerr << "Cannot set user description\n";
       return 5;

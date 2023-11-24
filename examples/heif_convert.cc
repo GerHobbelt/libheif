@@ -159,7 +159,7 @@ void list_all_decoders()
   std::cout << "AVIF decoders:\n";
   list_decoders(heif_compression_AV1);
 
-#if ENABLE_UNCOMPRESSED_ENCODER
+#if WITH_UNCOMPRESSED_CODEC
   std::cout << "uncompressed: yes\n";
 #else
   std::cout << "uncompressed: no\n";
@@ -536,7 +536,7 @@ int main(int argc, char** argv)
 
             std::string auxType = std::string(auxTypeC);
 
-            heif_image_handle_free_auxiliary_types(aux_handle, &auxTypeC);
+            heif_image_handle_release_auxiliary_type(aux_handle, &auxTypeC);
 
             std::ostringstream s;
             s << numbered_output_filename_stem;
