@@ -376,6 +376,86 @@ int main(int argc, char** argv)
       printf("  none\n");
     }
 
+    int numRegionItems = heif_image_handle_get_number_of_region_items(handle);
+    printf("region annotations:\n");
+    if (numRegionItems > 0) {
+      std::vector<heif_item_id> region_items(numRegionItems);
+      heif_image_handle_get_list_of_region_item_ids(handle, region_items.data(), numRegionItems);
+      for (heif_item_id region_item_id : region_items)
+      {
+        struct heif_region_item* region_item = heif_context_get_region_item(ctx.get(), region_item_id);
+
+        uint32_t reference_width, reference_height;
+        heif_region_item_get_reference_size(region_item, &reference_width, &reference_height);
+        int numRegions =  heif_region_item_get_number_of_regions(region_item);
+        printf("  id: %u, reference_width: %u, reference_height: %u, %d regions\n",
+               region_item_id,
+               reference_width,
+               reference_height,
+               numRegions);
+
+        std::vector<heif_region*> regions(numRegions);
+        numRegions = heif_region_item_get_list_of_regions(region_item, regions.data(), numRegions);
+        for (int j = 0; j < numRegions; j++)
+        {
+          printf("    region %d\n", j);
+          heif_region_type type = heif_region_get_type(regions[j]);
+          if (type == heif_region_type_point)
+          {
+            int32_t x;
+            int32_t y;
+            heif_region_get_point(regions[j], &x, &y);
+            printf("      point [x=%i, y=%i]\n", x, y);
+          }
+          else if (type == heif_region_type_rectangle)
+          {
+            int32_t x;
+            int32_t y;
+            uint32_t w;
+            uint32_t h;
+            heif_region_get_rectangle(regions[j], &x, &y, &w, &h);
+            printf("      rectangle [x=%i, y=%i, w=%u, h=%u]\n", x, y, w, h);
+          }
+        }
+
+        heif_region_release_many(regions.data(), numRegions);
+        heif_region_item_release(region_item);
+      }
+    }
+    else {
+      printf("  none\n");
+    }
+
+    // --- properties
+
+    printf("properties:\n");
+
+    // user descriptions
+
+#define MAX_PROPERTIES 50
+    heif_property_id propertyIds[MAX_PROPERTIES];
+    int count;
+    count = heif_item_get_properties_of_type(ctx.get(), IDs[i], heif_item_property_type_user_description,
+                                             propertyIds, MAX_PROPERTIES);
+
+    if (count>0) {
+      for (int p=0;p<count;p++) {
+        struct heif_property_user_description* udes;
+        err = heif_item_get_user_description(ctx.get(), IDs[i], propertyIds[p], &udes);
+        if (err.code) {
+          std::cerr << "Error reading udes " << IDs[i] << "/" << propertyIds[p] << "\n";
+        }
+        else {
+          printf("  user description:\n");
+          printf("    lang: %s\n",udes->lang);
+          printf("    name: %s\n",udes->name);
+          printf("    description: %s\n", udes->description);
+          printf("    tags: %s\n", udes->tags);
+
+          heif_property_user_description_release(udes);
+        }
+      }
+    }
 
     struct heif_image* image;
     err = heif_decode_image(handle,
