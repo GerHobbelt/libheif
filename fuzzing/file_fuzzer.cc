@@ -22,7 +22,7 @@
 #include <limits.h>
 #include <stdlib.h>
 
-#include "heif.h"
+#include "libheif/heif.h"
 
 static const enum heif_colorspace kFuzzColorSpace = heif_colorspace_YCbCr;
 static const enum heif_chroma kFuzzChroma = heif_chroma_420;
@@ -86,6 +86,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
   int images_count;
   heif_item_id* image_IDs = NULL;
 
+  heif_init(nullptr);
+
   heif_check_filetype(data, clip_int(size));
   heif_main_brand(data, clip_int(size));
   heif_get_file_mime_type(data, clip_int(size));
@@ -148,5 +150,8 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size)
   heif_image_handle_release(primary_handle);
   heif_context_free(ctx);
   free(image_IDs);
+
+  heif_deinit();
+
   return 0;
 }

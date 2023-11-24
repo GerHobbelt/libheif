@@ -90,21 +90,6 @@ target_compile_definitions(heif
                                LIBHEIF_EXPORTS
                                HAVE_VISIBILITY)
 
-if(WITH_TESTS)
-    # Same as the 'heif' target, but with all symbols exported.
-    # Used by tests to test private APIs.
-    # TODO: doesn't seem to work on windows?
-    add_library(heif_internal ${libheif_sources})
-    target_include_directories(heif_internal PRIVATE ${libheif_BINARY_DIR} ${libheif_SOURCE_DIR})
-    target_include_directories(heif_internal
-                                PUBLIC
-                                    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME}>
-                                    $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/include>
-                                    $<INSTALL_INTERFACE:include>)
-    target_compile_definitions(heif_internal PUBLIC LIBHEIF_EXPORTS)
-    set_target_properties(heif_internal PROPERTIES CXX_VISIBILITY_PRESET default)
-endif()
-
 if (PLUGIN_LOADING_SUPPORTED_AND_ENABLED)
     target_compile_definitions(heif PRIVATE ENABLE_PLUGIN_LOADING=1)
     target_link_libraries(heif PRIVATE ${CMAKE_DL_LIBS})
@@ -114,7 +99,7 @@ add_subdirectory(plugins)
 
 if (LIBSHARPYUV_FOUND)
     message("Compiling in 'libhsharpyuv'")
-    target_compile_definitions(heif PRIVATE HAVE_LIBSHARPYUV=1)
+    target_compile_definitions(heif PUBLIC HAVE_LIBSHARPYUV=1)
     target_include_directories(heif PRIVATE ${LIBSHARPYUV_INCLUDE_DIR})
     target_link_libraries(heif PRIVATE ${LIBSHARPYUV_LIBRARIES} ${LIBSHARPYUV_LINKDIR})
 else()
@@ -137,13 +122,9 @@ if (ENABLE_MULTITHREADING_SUPPORT)
     endif()
 endif()
 
-if (ENABLE_UNCOMPRESSED)
-    target_compile_definitions(heif PRIVATE ENABLE_UNCOMPRESSED=1)
+if (WITH_UNCOMPRESSED_CODEC)
+    target_compile_definitions(heif PRIVATE WITH_UNCOMPRESSED_CODEC=1)
     target_sources(heif PRIVATE
-            uncompressed_image.h
-            uncompressed_image.cc)
-    target_compile_definitions(heif_internal PRIVATE ENABLE_UNCOMPRESSED=1)
-    target_sources(heif_internal PRIVATE
             uncompressed_image.h
             uncompressed_image.cc)
 endif()

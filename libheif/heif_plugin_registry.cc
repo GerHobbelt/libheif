@@ -28,7 +28,7 @@
 
 #include "heif_plugin_registry.h"
 
-#if ENABLE_UNCOMPRESSED
+#if WITH_UNCOMPRESSED_CODEC
 #include "libheif/plugins/heif_encoder_uncompressed.h"
 #endif
 
@@ -119,7 +119,7 @@ void heif::register_default_plugins()
   heif::register_encoder(get_encoder_plugin_openjpeg());
 #endif
 
-#if ENABLE_UNCOMPRESSED
+#if WITH_UNCOMPRESSED_CODEC
   heif::register_encoder(get_encoder_plugin_uncompressed());
 #endif
 }
