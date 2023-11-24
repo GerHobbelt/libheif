@@ -40,10 +40,7 @@ namespace heif {
     Box_cmpd()
     {
       set_short_type(fourcc("cmpd"));
-      set_is_full_box(false);
     }
-
-    Box_cmpd(const BoxHeader& hdr) : Box(hdr) {}
 
     std::string dump(Indent&) const override;
 
@@ -63,16 +60,13 @@ namespace heif {
     std::vector<Component> m_components;
   };
 
-  class Box_uncC : public Box
+  class Box_uncC : public FullBox
   {
   public:
     Box_uncC()
     {
       set_short_type(fourcc("uncC"));
-      set_is_full_box(false);
     }
-
-    Box_uncC(const BoxHeader& hdr) : Box(hdr) {}
 
     std::string dump(Indent&) const override;
 
