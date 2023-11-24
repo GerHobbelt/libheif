@@ -20,6 +20,7 @@
 
 #include "libheif/heif_plugin.h"
 #include "libheif/region.h"
+#include "libheif/common_utils.h"
 #include <cstdint>
 
 #if defined(HAVE_CONFIG_H)
@@ -121,21 +122,21 @@ heif_filetype_result heif_check_filetype(const uint8_t* data, int len)
   }
 
   if (len >= 12) {
-    heif_brand brand = heif_main_brand(data, len);
+    heif_brand2 brand = heif_read_main_brand(data, len);
 
-    if (brand == heif_heic) {
+    if (brand == heif_brand2_heic) {
       return heif_filetype_yes_supported;
     }
-    else if (brand == heif_heix) {
+    else if (brand == heif_brand2_heix) {
       return heif_filetype_yes_supported;
     }
-    else if (brand == heif_avif) {
+    else if (brand == heif_brand2_avif) {
       return heif_filetype_yes_supported;
     }
-    else if (brand == heif_unknown_brand) {
-      return heif_filetype_no;
+    else if (brand == heif_brand2_mif1) {
+      return heif_filetype_maybe;
     }
-    else if (brand == heif_mif1) {
+    else if (brand == heif_brand2_mif2) {
       return heif_filetype_maybe;
     }
     else {
@@ -239,8 +240,6 @@ heif_brand2 heif_read_main_brand(const uint8_t* data, int len)
   return heif_fourcc_to_brand((char*) (data + 8));
 }
 
-
-#define fourcc_to_uint32(id) (((uint32_t)(id[0])<<24) | (id[1]<<16) | (id[2]<<8) | (id[3]))
 
 heif_brand2 heif_fourcc_to_brand(const char* fourcc)
 {
@@ -1990,7 +1989,7 @@ struct heif_error heif_item_add_property_user_description(const struct heif_cont
   udes->set_description(description->description ? description->description : "");
   udes->set_tags(description->tags ? description->tags : "");
 
-  heif_property_id id = context->context->add_property(itemId, udes);
+  heif_property_id id = context->context->add_property(itemId, udes, false);
 
   if (out_propertyId) {
     *out_propertyId = id;
