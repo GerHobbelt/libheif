@@ -74,9 +74,3 @@ plugin_compilation(rav1e RAV1E RAV1E RAV1E)
 set(OpenJPEG_sources heif_encoder_openjpeg.cc heif_encoder_openjpeg.h)
 set(OpenJPEG_extra_plugin_sources ../error.cc ../common_utils.cc ../common_utils.h)
 plugin_compilation(OpenJPEG OPENJPEG OpenJPEG   OPENJPEG)
-
-if (WITH_UNCOMPRESSED_CODEC)
-    target_sources(heif PRIVATE
-            heif_encoder_uncompressed.h
-            heif_encoder_uncompressed.cc)
-endif()

@@ -28,10 +28,6 @@
 
 #include "heif_plugin_registry.h"
 
-#if WITH_UNCOMPRESSED_CODEC
-#include "libheif/plugins/heif_encoder_uncompressed.h"
-#endif
-
 #if HAVE_LIBDE265
 #include "libheif/plugins/heif_decoder_libde265.h"
 #endif
@@ -117,10 +113,6 @@ void heif::register_default_plugins()
 
 #if HAVE_OPENJPEG
   heif::register_encoder(get_encoder_plugin_openjpeg());
-#endif
-
-#if WITH_UNCOMPRESSED_CODEC
-  heif::register_encoder(get_encoder_plugin_uncompressed());
 #endif
 }
 

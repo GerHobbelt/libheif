@@ -2211,7 +2211,7 @@ Error HeifContext::encode_image(const std::shared_ptr<HeifPixelImage>& pixel_ima
   return error;
 }
 
-
+/*
 static uint32_t get_rotated_width(heif_orientation orientation, uint32_t w, uint32_t h)
 {
   return ((int)orientation) > 4 ? h : w;
@@ -2222,7 +2222,7 @@ static uint32_t get_rotated_height(heif_orientation orientation, uint32_t w, uin
 {
   return ((int)orientation) > 4 ? w : h;
 }
-
+*/
 
 void HeifContext::write_image_metadata(std::shared_ptr<HeifPixelImage> src_image, int image_id)
 {
@@ -2373,80 +2373,35 @@ Error HeifContext::encode_image_as_hevc(const std::shared_ptr<HeifPixelImage>& i
                  heif_suberror_Invalid_image_size);
   }
 
+  // Note: 'ispe' must be before the transformation properties
+  m_heif_file->add_ispe_property(image_id, encoded_width, encoded_height);
+
   // if image size was rounded up to even size, add a 'clap' box to crop the
   // padding border away
 
-  uint32_t rotated_width = get_rotated_width(options.image_orientation, out_image->get_width(), out_image->get_height());
-  uint32_t rotated_height = get_rotated_height(options.image_orientation, out_image->get_width(), out_image->get_height());
+  //uint32_t rotated_width = get_rotated_width(options.image_orientation, out_image->get_width(), out_image->get_height());
+  //uint32_t rotated_height = get_rotated_height(options.image_orientation, out_image->get_width(), out_image->get_height());
 
   if (out_image->get_width() != encoded_width ||
       out_image->get_height() != encoded_height) {
-    if (options.macOS_compatibility_workaround == false) {
-      m_heif_file->add_clap_property(image_id,
-                                     out_image->get_width(),
-                                     out_image->get_height(),
-                                     encoded_width,
-                                     encoded_height);
+    m_heif_file->add_clap_property(image_id,
+                                   out_image->get_width(),
+                                   out_image->get_height(),
+                                   encoded_width,
+                                   encoded_height);
 
-      m_heif_file->add_orientation_properties(image_id, options.image_orientation);
+    m_heif_file->add_orientation_properties(image_id, options.image_orientation);
 
-      m_heif_file->add_ispe_property(image_id, rotated_width, rotated_height);
+    // MIAF 7.3.6.7
 
-      // MIAF 7.3.6.7
-
-      if (!is_integer_multiple_of_chroma_size(out_image->get_width(),
-                                              out_image->get_height(),
-                                              src_image->get_chroma_format())) {
-        out_image->mark_not_miaf_compatible();
-      }
-    }
-    else {
-      // --- wrap the encoded image in a grid image just to apply the cropping
-
-      heif_item_id grid_image_id = m_heif_file->add_new_image("grid");
-      auto grid_image = std::make_shared<Image>(this, grid_image_id);
-
-      m_heif_file->add_iref_reference(grid_image_id, fourcc("dimg"), {image_id});
-
-      ImageGrid grid;
-      grid.set_num_tiles(1, 1);
-      grid.set_output_size(src_image->get_width(heif_channel_Y), src_image->get_height(heif_channel_Y)); // TODO: using out_image->get_width/height() would be shorter.
-      auto grid_data = grid.write();
-
-      // MIAF 7.3.11.4.2
-
-      if (!is_integer_multiple_of_chroma_size(out_image->get_width(),
-                                              out_image->get_height(),
-                                              src_image->get_chroma_format())) {
-        grid_image->mark_not_miaf_compatible();
-      }
-
-      if ((encoded_width % 64) != 0 ||
-          (encoded_height % 64) != 0) {
-        grid_image->mark_not_miaf_compatible();
-      }
-
-
-      m_heif_file->add_ispe_property(image_id, encoded_width, encoded_height);
-
-      m_heif_file->append_iloc_data(grid_image_id, grid_data, 1);
-      m_heif_file->add_orientation_properties(grid_image_id, options.image_orientation);
-      m_heif_file->add_ispe_property(grid_image_id, rotated_width, rotated_height);
-
-      // --- now use the grid image instead of the original image
-
-      // hide the original image
-      m_heif_file->get_infe_box(image_id)->set_hidden_item(true);
-
-      out_image = grid_image;
-
-      // now use the grid image for all further property output
-      image_id = grid_image_id;
+    if (!is_integer_multiple_of_chroma_size(out_image->get_width(),
+                                            out_image->get_height(),
+                                            src_image->get_chroma_format())) {
+      out_image->mark_not_miaf_compatible();
     }
   }
   else {
     m_heif_file->add_orientation_properties(image_id, options.image_orientation);
-    m_heif_file->add_ispe_property(image_id, rotated_width, rotated_height);
   }
 
   // --- choose which color profile to put into 'colr' box
@@ -2656,15 +2611,13 @@ Error HeifContext::encode_image_as_av1(const std::shared_ptr<HeifPixelImage>& im
   m_heif_file->set_av1C_configuration(image_id, config);
 
 
-  m_heif_file->add_orientation_properties(image_id, options.image_orientation);
-
   uint32_t input_width, input_height;
   input_width = src_image->get_width();
   input_height = src_image->get_height();
-  m_heif_file->add_ispe_property(image_id,
-                                 get_rotated_width(options.image_orientation, input_width, input_height),
-                                 get_rotated_height(options.image_orientation, input_width, input_height));
 
+  // Note: 'ispe' must be before the transformation properties
+  m_heif_file->add_ispe_property(image_id, input_width, input_height);
+  m_heif_file->add_orientation_properties(image_id, options.image_orientation);
 
   if (encoder->plugin->plugin_api_version >= 3 &&
       encoder->plugin->query_encoded_size != nullptr) {

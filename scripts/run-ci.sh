@@ -121,23 +121,24 @@ fi
 
 if [ ! -z "$CMAKE" ]; then
     echo "Preparing cmake build files ..."
-    CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
-    if [ "$CURRENT_OS" = "osx" ] ; then
-        # Make sure the homebrew installed libraries are used when building instead
-        # of the libraries provided by Apple.
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_FIND_FRAMEWORK=LAST"
-    fi
-    if [ "$WITH_RAV1E" = "1" ]; then
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DUSE_LOCAL_RAV1E=1"
-    fi
-    if [ "$CLANG_TIDY" = "1" ]; then
-        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
-    fi
+
     if [ ! -z "$FUZZER" ]; then
         CMAKE_OPTIONS="--preset=fuzzing"
     fi
     if [ ! -z "$TESTS" ]; then
         CMAKE_OPTIONS="--preset=testing"
+    fi
+    if [ -z "$FUZZER" ] && [ -z "$TESTS" ]; then
+        CMAKE_OPTIONS="--preset=release -DENABLE_PLUGIN_LOADING=OFF"
+    fi
+	
+    if [ "$CURRENT_OS" = "osx" ] ; then
+        # Make sure the homebrew installed libraries are used when building instead
+        # of the libraries provided by Apple.
+        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_FIND_FRAMEWORK=LAST"
+    fi
+    if [ "$CLANG_TIDY" = "1" ]; then
+        CMAKE_OPTIONS="$CMAKE_OPTIONS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     fi
     cmake . $CMAKE_OPTIONS
 fi
@@ -154,6 +155,12 @@ if [ -z "$EMSCRIPTEN_VERSION" ] && [ -z "$CHECK_LICENSES" ] && [ -z "$TARBALL" ]
         make test
     fi
     if [ -z "$FUZZER" ] ; then
+	echo "List available encoders"
+        ${BIN_WRAPPER} ./examples/heif-enc${BIN_SUFFIX} --list-encoders
+
+	echo "List available decoders"
+        ${BIN_WRAPPER} ./examples/heif-convert${BIN_SUFFIX} --list-decoders
+
         echo "Dumping information of sample file ..."
         ${BIN_WRAPPER} ./examples/heif-info${BIN_SUFFIX} --dump-boxes examples/example.heic
         if [ ! -z "$WITH_GRAPHICS" ] && [ ! -z "$WITH_HEIF_DECODER" ]; then
@@ -237,26 +244,21 @@ if [ ! -z "$EMSCRIPTEN_VERSION" ]; then
 fi
 
 if [ ! -z "$TARBALL" ]; then
-    CONFIGURE_ARGS=
-    if [ ! -z "$GO" ]; then
-        CONFIGURE_ARGS="$CONFIGURE_ARGS --prefix=$BUILD_ROOT/dist --disable-gdk-pixbuf"
-    else
-        CONFIGURE_ARGS="$CONFIGURE_ARGS --disable-go"
-    fi
-    if [ "$WITH_RAV1E" = "1" ]; then
-        CONFIGURE_ARGS="$CONFIGURE_ARGS --enable-local-rav1e"
-    fi
-
-    VERSION=$(grep AC_INIT configure.ac | sed -r 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/g')
+    VERSION=$(grep project CMakeLists.txt | sed -r 's/^[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/g')
     echo "Creating tarball for version $VERSION ..."
-    make dist
+    mkdir build
+    pushd build
+    cmake .. --preset=release
+    make package_source
+    mv libheif-$VERSION-Source.tar.gz ..
+    popd
 
     echo "Building from tarball ..."
-    tar xf libheif-$VERSION.tar*
-    pushd libheif-$VERSION
-    mkdir -p ./third-party/
-    ln -s $BUILD_ROOT/third-party/rav1e ./third-party/
-    ./configure $CONFIGURE_ARGS
+    tar xf libheif-$VERSION-Source.tar*
+    pushd libheif-$VERSION-Source
+    mkdir build
+    pushd build
+    cmake .. --preset=release
     make -j $(nproc)
     popd
 fi
