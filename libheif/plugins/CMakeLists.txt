@@ -75,7 +75,7 @@ set(OpenJPEG_sources heif_encoder_openjpeg.cc heif_encoder_openjpeg.h)
 set(OpenJPEG_extra_plugin_sources ../error.cc ../common_utils.cc ../common_utils.h)
 plugin_compilation(OpenJPEG OPENJPEG OpenJPEG   OPENJPEG)
 
-if (ENABLE_UNCOMPRESSED_ENCODER)
+if (ENABLE_UNCOMPRESSED)
     target_sources(heif PRIVATE
             heif_encoder_uncompressed.h
             heif_encoder_uncompressed.cc)

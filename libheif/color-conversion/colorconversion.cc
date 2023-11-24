@@ -248,9 +248,9 @@ bool ColorConversionPipeline::construct_pipeline(const ColorState& input_state,
   border_states.push_back({-1, nullptr, {input_state, 0}});
 
   while (!border_states.empty()) {
-    size_t minIdx = -1;
+    int minIdx = -1;
     int minCost = std::numeric_limits<int>::max();
-    for (size_t i = 0; i < border_states.size(); i++) {
+    for (int i = 0; i < (int)border_states.size(); i++) {
       int cost = border_states[i].color_state.speed_costs;
       if (cost < minCost) {
         minIdx = i;
@@ -455,8 +455,7 @@ std::shared_ptr<HeifPixelImage> convert_colorspace(const std::shared_ptr<HeifPix
   // check for valid target YCbCr chroma formats
 
   if (target_colorspace == heif_colorspace_YCbCr) {
-    if (target_chroma != heif_chroma_monochrome &&
-        target_chroma != heif_chroma_420 &&
+    if (target_chroma != heif_chroma_420 &&
         target_chroma != heif_chroma_422 &&
         target_chroma != heif_chroma_444) {
       return nullptr;

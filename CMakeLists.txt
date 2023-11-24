@@ -102,8 +102,7 @@ plugin_option(SvtEnc SvtEnc "Svt-av1" "AVIF encoder" ON)
 plugin_option(RAV1E RAV1E "Rav1e" "AVIF encoder" ON)
 plugin_option(OpenJPEG OpenJPEG "OpenJPEG" "JPEG2000 encoder" OFF)
 
-option(ENABLE_UNCOMPRESSED_DECODER "Support internal ISO/IEC 23001-17 uncompressed decoder (experimental)" OFF)
-option(ENABLE_UNCOMPRESSED_ENCODER "Support internal ISO/IEC 23001-17 uncompressed encoder (experimental)" OFF)
+option(ENABLE_UNCOMPRESSED "Support internal ISO/IEC 23001-17 uncompressed codec (experimental)" OFF)
 
 # Libsharpyuv
 option(WITH_LIBSHARPYUV "Build libsharpyuv" ON)

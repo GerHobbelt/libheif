@@ -35,10 +35,8 @@
 #include <cstring>
 #include <cassert>
 
-#ifdef ENABLE_UNCOMPRESSED_DECODER
-
+#if ENABLE_UNCOMPRESSED
 #include "uncompressed_image.h"
-
 #endif
 
 using namespace heif;
@@ -300,7 +298,7 @@ heif::Error heif::FullBox::write_header(StreamWriter& writer, size_t total_size,
     return err;
   }
 
-  assert((get_flags() & ~0x00FFFFFF) == 0);
+  assert((get_flags() & ~0x00FFFFFFU) == 0);
 
   writer.write32((get_version() << 24) | get_flags());
 
@@ -552,7 +550,7 @@ Error Box::read(BitstreamRange& range, std::shared_ptr<heif::Box>* result)
       box = std::make_shared<Box_udes>();
       break;
 
-#ifdef ENABLE_UNCOMPRESSED_DECODER
+#if ENABLE_UNCOMPRESSED
     case fourcc("cmpd"):
       box = std::make_shared<Box_cmpd>();
       break;
@@ -1571,10 +1569,10 @@ void Box_infe::set_hidden_item(bool hidden)
   m_hidden_item = hidden;
 
   if (m_hidden_item) {
-    set_flags(get_flags() | 1);
+    set_flags(get_flags() | 1U);
   }
   else {
-    set_flags(get_flags() & ~1);
+    set_flags(get_flags() & ~1U);
   }
 }
 
