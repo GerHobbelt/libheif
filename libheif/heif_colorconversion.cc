@@ -2375,7 +2375,7 @@ Op_RGB24_32_to_YCbCr444_GBR::convert_colorspace(const std::shared_ptr<const Heif
   }
 
 
-  assert(target_state.nclx_profile);
+  assert(!!target_state.nclx_profile);
   assert(target_state.nclx_profile->get_matrix_coefficients() == 0);
 
 

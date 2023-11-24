@@ -55,7 +55,7 @@ static int usage(const char* command)
 }
 
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
   int opt;
   int size = 512; // default thumbnail size
