@@ -105,6 +105,19 @@ plugin_option(OpenJPEG OpenJPEG "OpenJPEG" "JPEG2000 encoder" OFF)
 option(ENABLE_UNCOMPRESSED_DECODER "Support internal ISO/IEC 23001-17 uncompressed decoder (experimental)" OFF)
 option(ENABLE_UNCOMPRESSED_ENCODER "Support internal ISO/IEC 23001-17 uncompressed encoder (experimental)" OFF)
 
+# Libsharpyuv
+option(WITH_LIBSHARPYUV "Build libsharpyuv" ON)
+if (WITH_LIBSHARPYUV)
+    find_package(libsharpyuv)
+endif ()
+if (LIBSHARPYUV_FOUND)
+    message("libsharpyuv: found")
+elseif (WITH_${variableName})
+    message("libsharpyuv: not found")
+else()
+    message("libsharpyuv: disabled")
+endif ()
+
 # --- Create libheif pkgconfig file
 
 set(prefix ${CMAKE_INSTALL_PREFIX})
@@ -144,6 +157,9 @@ else()
     message("*****************NOT FOUND**************************")
 
 endif()
+if (LIBSHARPYUV_FOUND)
+    list(APPEND REQUIRES_PRIVATE "libsharpyuv")
+endif()
 list(JOIN REQUIRES_PRIVATE " " REQUIRES_PRIVATE)
 set(VERSION ${PROJECT_VERSION})
 
@@ -156,12 +172,24 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libheif.pc
 
 option(WITH_EXAMPLES "Build examples" ON)
 
+if (WIN32)
+    # Tests are off by default on windows as they currently fail to build.
+    # TODO: fix tests on windows.
+    option(WITH_TESTS "Build tests" OFF)
+else()
+    option(WITH_TESTS "Build tests" ON)
+endif()
+
 option(WITH_DEFLATE_HEADER_COMPRESSION OFF)
 option(ENABLE_MULTITHREADING_SUPPORT "Switch off for platforms without multithreading support" ON)
 option(ENABLE_PARALLEL_TILE_DECODING "Will launch multiple decoders to decode tiles in parallel (requires ENABLE_MULTITHREADING_SUPPORT)" ON)
 
 if(WITH_EXAMPLES)
     add_subdirectory (examples)
+endif()
+if(WITH_TESTS)
+    include(CTest)
+    add_subdirectory (tests)
 endif()
 add_subdirectory (libheif)
 add_subdirectory (gdk-pixbuf)
