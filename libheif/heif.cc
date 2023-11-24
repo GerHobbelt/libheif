@@ -50,7 +50,7 @@
 #include <vector>
 #include <cstring>
 
-#if (defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)) && !defined(HAVE_UNISTD_H)
+#ifdef _WIN32
 // for _write
 #include <io.h>
 #else
@@ -477,8 +477,8 @@ void heif_context_debug_dump_boxes_to_file(struct heif_context* ctx, int fd)
 
   std::string dump = ctx->context->debug_dump_boxes();
   // TODO(fancycode): Should we return an error if writing fails?
-#if (defined(__MINGW32__) || defined(__MINGW64__) || defined(_MSC_VER)) && !defined(HAVE_UNISTD_H)
-  auto written = _write(fd, dump.c_str(), dump.size());
+#ifdef _WIN32
+  auto written = _write(fd, dump.c_str(), static_cast<unsigned int>(dump.size()));
 #else
   auto written = write(fd, dump.c_str(), dump.size());
 #endif
@@ -949,6 +949,7 @@ void fill_default_decoding_options(heif_decoding_options& options)
 
   // version 5
 
+  options.color_conversion_options.version = 1;
   options.color_conversion_options.preferred_chroma_downsampling_algorithm = heif_chroma_downsampling_average;
   options.color_conversion_options.preferred_chroma_upsampling_algorithm = heif_chroma_upsampling_bilinear;
   options.color_conversion_options.only_use_preferred_chroma_algorithm = false;
@@ -2843,6 +2844,7 @@ static void set_default_options(heif_encoding_options& options)
   options.macOS_compatibility_workaround_no_nclx_profile = true;
   options.image_orientation = heif_orientation_normal;
 
+  options.color_conversion_options.version = 1;
   options.color_conversion_options.preferred_chroma_downsampling_algorithm = heif_chroma_downsampling_average;
   options.color_conversion_options.preferred_chroma_upsampling_algorithm = heif_chroma_upsampling_bilinear;
   options.color_conversion_options.only_use_preferred_chroma_algorithm = false;
