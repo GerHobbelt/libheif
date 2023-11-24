@@ -18,7 +18,7 @@
  * along with libheif.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "heif_file.h"
+#include "file.h"
 #include "libheif/box.h"
 
 #include <cstdint>
@@ -44,8 +44,6 @@
 #if WITH_UNCOMPRESSED_CODEC
 #include "uncompressed_image.h"
 #endif
-
-using namespace heif;
 
 // TODO: make this a decoder option
 #define STRICT_PARSING false
@@ -98,7 +96,7 @@ Error HeifFile::read(const std::shared_ptr<StreamReader>& reader)
   m_input_stream = reader;
 
   uint64_t maxSize = std::numeric_limits<int64_t>::max();
-  heif::BitstreamRange range(m_input_stream, maxSize);
+  BitstreamRange range(m_input_stream, maxSize);
 
   Error error = parse_heif_file(range);
   return error;
@@ -203,7 +201,7 @@ std::string HeifFile::debug_dump_boxes() const
       sstr << "\n";
     }
 
-    heif::Indent indent;
+    Indent indent;
     sstr << box->dump(indent);
   }
 

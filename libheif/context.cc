@@ -38,22 +38,20 @@
 #include <future>
 #endif
 
-#include "heif_context.h"
-#include "heif_file.h"
-#include "heif_image.h"
-#include "heif_api_structs.h"
-#include "heif_limits.h"
-#include "heif_hevc.h"
-#include "heif_avif.h"
-#include "heif_plugin_registry.h"
+#include "context.h"
+#include "file.h"
+#include "pixelimage.h"
+#include "api_structs.h"
+#include "security_limits.h"
+#include "hevc.h"
+#include "avif.h"
+#include "plugin_registry.h"
 #include "libheif/color-conversion/colorconversion.h"
 #include "metadata_compression.h"
 
 #if WITH_UNCOMPRESSED_CODEC
 #include "uncompressed_image.h"
 #endif
-
-using namespace heif;
 
 heif_encoder::heif_encoder(const struct heif_encoder_plugin* _plugin)
     : plugin(_plugin)
@@ -495,50 +493,6 @@ void HeifContext::write(StreamWriter& writer)
 std::string HeifContext::debug_dump_boxes() const
 {
   return m_heif_file->debug_dump_boxes();
-}
-
-void HeifContext::register_decoder(const heif_decoder_plugin* decoder_plugin)
-{
-  if (decoder_plugin->init_plugin) {
-    (*decoder_plugin->init_plugin)();
-  }
-
-  m_decoder_plugins.insert(decoder_plugin);
-}
-
-
-const struct heif_decoder_plugin* HeifContext::get_decoder(enum heif_compression_format type, const char* name_id) const
-{
-  int highest_priority = 0;
-  const struct heif_decoder_plugin* best_plugin = nullptr;
-
-
-  // search global plugins
-
-  best_plugin = heif::get_decoder(type, name_id);
-  if (best_plugin != nullptr) {
-    highest_priority = best_plugin->does_support_format(type);
-  }
-
-
-  // search context-local plugins (DEPRECATED)
-
-  for (const auto* plugin : m_decoder_plugins) {
-    int priority = plugin->does_support_format(type);
-
-    if (priority > 0 && name_id && plugin->plugin_api_version >= 3) {
-      if (strcmp(name_id, plugin->id_name) == 0) {
-        return plugin;
-      }
-    }
-
-    if (priority > highest_priority) {
-      highest_priority = priority;
-      best_plugin = plugin;
-    }
-  }
-
-  return best_plugin;
 }
 
 

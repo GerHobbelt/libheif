@@ -38,9 +38,8 @@
 #include "monochrome.h"
 #include "alpha.h"
 #include "hdr_sdr.h"
+#include "chroma_sampling.h"
 
-
-using namespace heif;
 
 #define DEBUG_ME 0
 #define DEBUG_PIPELINE_CREATION 0

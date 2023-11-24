@@ -27,9 +27,7 @@
 #include <iomanip>
 #include "catch.hpp"
 #include "libheif/color-conversion/colorconversion.h"
-#include "libheif/heif_image.h"
-
-using namespace heif;
+#include "libheif/pixelimage.h"
 
 // Enable for more verbose test output.
 #define DEBUG_ME 0
@@ -261,7 +259,7 @@ void TestConversion(const std::string& test_name, const ColorState& input_state,
   if (!supported) return;
   INFO("conversion pipeline: " << pipeline.debug_dump_pipeline());
 
-  auto in_image = std::make_shared<heif::HeifPixelImage>();
+  auto in_image = std::make_shared<HeifPixelImage>();
   // Width and height are multiples of 4.
   int width = 12;
   int height = 8;
