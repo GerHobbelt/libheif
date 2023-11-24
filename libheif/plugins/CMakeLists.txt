@@ -82,6 +82,14 @@ set(JPEG_ENCODER_sources encoder_jpeg.cc encoder_jpeg.h)
 set(JPEG_ENCODER_extra_plugin_sources)
 plugin_compilation(jpegenc JPEG JPEG_ENCODER JPEG_ENCODER)
 
+set(OpenJPEG_DECODER_sources decoder_openjpeg.cc decoder_openjpeg.h)
+set(OpenJPEG_DECODER_extra_plugin_sources ) 
+plugin_compilation(OpenJPEG_Decoder OPENJPEG OpenJPEG_DECODER OPENJPEG_DECODER) 
+
+set(OpenJPEG_ENCODER_sources encoder_openjpeg.cc encoder_openjpeg.h)
+set(OpenJPEG_ENCODER_extra_plugin_sources)
+plugin_compilation(OpenJPEG_Encoder OPENJPEG OpenJPEG_ENCODER OPENJPEG_ENCODER)
+
 set(KVAZAAR_sources encoder_kvazaar.cc encoder_kvazaar.h)
 set(KVAZAAR_extra_plugin_sources)
 plugin_compilation(kvazaar KVAZAAR KVAZAAR KVAZAAR)
