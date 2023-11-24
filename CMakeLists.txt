@@ -1,6 +1,6 @@
 cmake_minimum_required (VERSION 3.0)
 
-project(libheif LANGUAGES C CXX VERSION 1.16.1)
+project(libheif LANGUAGES C CXX VERSION 1.16.2)
 
 # https://cmake.org/cmake/help/v3.1/policy/CMP0054.html
 cmake_policy(VERSION 3.0...3.22)
@@ -99,6 +99,7 @@ plugin_option(AOM_ENCODER AOM "aom" "AVIF encoder" OFF)
 plugin_option(AOM_DECODER AOM "aom" "AVIF decoder" OFF)
 plugin_option(SvtEnc SvtEnc "Svt-av1" "AVIF encoder" ON)
 plugin_option(RAV1E RAV1E "Rav1e" "AVIF encoder" ON)
+plugin_option(JPEG_DECODER JPEG "Jpeg" "JPEG decoder" OFF)
 plugin_option(OpenJPEG OpenJPEG "OpenJPEG" "JPEG2000 encoder" OFF)
 
 option(WITH_UNCOMPRESSED_CODEC "Support internal ISO/IEC 23001-17 uncompressed codec (experimental)" OFF)
@@ -159,7 +160,6 @@ if (LIBSHARPYUV_FOUND)
     list(APPEND REQUIRES_PRIVATE "libsharpyuv")
 endif()
 list(JOIN REQUIRES_PRIVATE " " REQUIRES_PRIVATE)
-set(VERSION ${PROJECT_VERSION})
 
 configure_file(libheif.pc.in ${CMAKE_CURRENT_BINARY_DIR}/libheif.pc @ONLY)
 
