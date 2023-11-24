@@ -124,12 +124,12 @@ void opj_query_input_colorspace(enum heif_colorspace* inout_colorspace, enum hei
 
 
 struct heif_error opj_encode_image(void* encoder_raw, const struct heif_image* image, enum heif_image_input_class image_class) {
-  return heif_error {heif_error_Unsupported_feature, heif_suberror_Unsupported_codec, "JPEG2000 Encoding has not be implemented yet"};
+  return heif_error {heif_error_Unsupported_feature, heif_suberror_Unsupported_codec, "JPEG2000 Encoding has not been implemented yet"};
 
 }
 
 struct heif_error opj_get_compressed_data(void* encoder_raw, uint8_t** data, int* size, enum heif_encoded_data_type* type) {
-  return heif_error {heif_error_Unsupported_feature, heif_suberror_Unsupported_codec, "JPEG2000 Encoding has not be implemented yet"};
+  return heif_error {heif_error_Unsupported_feature, heif_suberror_Unsupported_codec, "JPEG2000 Encoding has not been implemented yet"};
 }
 
 void opj_query_input_colorspace2(void* encoder, enum heif_colorspace* inout_colorspace, enum heif_chroma* inout_chroma) {
