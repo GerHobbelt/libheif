@@ -619,6 +619,9 @@ void heif_image_handle_release(const struct heif_image_handle*);
 LIBHEIF_API
 int heif_image_handle_is_primary_image(const struct heif_image_handle* handle);
 
+LIBHEIF_API
+heif_item_id heif_image_handle_get_item_id(const struct heif_image_handle* handle);
+
 // Get the resolution of an image.
 LIBHEIF_API
 int heif_image_handle_get_width(const struct heif_image_handle* handle);
@@ -958,15 +961,12 @@ enum heif_item_property_type
 {
 //  heif_item_property_unknown = -1,
   heif_item_property_type_invalid = 0,
-  heif_item_property_type_user_description = 1
+  heif_item_property_type_user_description = heif_fourcc('u', 'd', 'e', 's'),
+  heif_item_property_type_transform_mirror = heif_fourcc('i', 'm', 'i', 'r'),
+  heif_item_property_type_transform_rotation = heif_fourcc('i', 'r', 'o', 't'),
+  heif_item_property_type_transform_crop = heif_fourcc('c', 'l', 'a', 'p'),
+  heif_item_property_type_image_size = heif_fourcc('i', 's', 'p', 'e')
 };
-
-LIBHEIF_API
-int heif_item_get_properties_of_type(const struct heif_context* context,
-                                     heif_item_id id,
-                                     enum heif_item_property_type type,
-                                     heif_property_id* out_list,
-                                     int count);
 
 // The strings are managed by libheif. They will be deleted in heif_property_user_description_release().
 struct heif_property_user_description
@@ -982,10 +982,61 @@ struct heif_property_user_description
 };
 
 LIBHEIF_API
-struct heif_error heif_item_get_user_description(const struct heif_context* context,
-                                                 heif_item_id itemId,
-                                                 heif_property_id propertyId,
-                                                 struct heif_property_user_description** out);
+struct heif_error heif_item_get_property_user_description(const struct heif_context* context,
+                                                          heif_item_id itemId,
+                                                          heif_property_id propertyId,
+                                                          struct heif_property_user_description** out);
+
+LIBHEIF_API
+struct heif_error heif_item_set_property_user_description(const struct heif_context* context,
+                                                          heif_item_id itemId,
+                                                          const struct heif_property_user_description* description,
+                                                          heif_property_id* out_propertyId);
+
+LIBHEIF_API
+int heif_item_get_properties_of_type(const struct heif_context* context,
+                                     heif_item_id id,
+                                     enum heif_item_property_type type,
+                                     heif_property_id* out_list,
+                                     int count);
+
+LIBHEIF_API
+int heif_item_get_transformation_properties(const struct heif_context* context,
+                                            heif_item_id id,
+                                            heif_property_id* out_list,
+                                            int count);
+
+LIBHEIF_API
+enum heif_item_property_type heif_item_get_property_type(const struct heif_context* context,
+                                                         heif_item_id id,
+                                                         heif_property_id property_id);
+
+enum heif_transform_mirror_direction
+{
+  heif_transform_mirror_direction_vertical = 0,
+  heif_transform_mirror_direction_horizontal = 1
+};
+
+LIBHEIF_API
+enum heif_transform_mirror_direction heif_item_get_property_transform_mirror(const struct heif_context* context,
+                                                                             heif_item_id itemId,
+                                                                             heif_property_id propertyId);
+
+// Returns -1 in case of error (but it will only return an error in case of wrong usage).
+LIBHEIF_API
+int heif_item_get_property_transform_rotation_ccw(const struct heif_context* context,
+                                                  heif_item_id itemId,
+                                                  heif_property_id propertyId);
+
+// Returns the number of pixels that should be removed from the four edges.
+// Because of the way this data is stored, you have to pass the image size at the moment of the crop operation
+// to compute the cropped border sizes.
+LIBHEIF_API
+void heif_item_get_property_transform_crop_borders(const struct heif_context* context,
+                                                   heif_item_id itemId,
+                                                   heif_property_id propertyId,
+                                                   int image_width, int image_height,
+                                                   int* left, int* top, int* right, int* bottom);
 
 LIBHEIF_API
 void heif_property_user_description_release(struct heif_property_user_description*);
@@ -1821,7 +1872,7 @@ LIBHEIF_API
 void heif_region_release(const struct heif_region* region);
 
 LIBHEIF_API
-void heif_region_release_many(const struct heif_region*const* regions, int num);
+void heif_region_release_many(const struct heif_region* const* regions, int num);
 
 
 LIBHEIF_API
@@ -1831,9 +1882,47 @@ LIBHEIF_API
 struct heif_error heif_region_get_point(const struct heif_region* region, int32_t* x, int32_t* y);
 
 LIBHEIF_API
+struct heif_error heif_region_get_point_scaled(const struct heif_region* region, double* x, double* y,
+                                               heif_item_id image_id);
+
+LIBHEIF_API
 struct heif_error heif_region_get_rectangle(const struct heif_region* region,
                                             int32_t* x, int32_t* y,
                                             uint32_t* width, uint32_t* height);
+
+LIBHEIF_API
+struct heif_error heif_region_get_rectangle_scaled(const struct heif_region* region,
+                                                   double* x, double* y,
+                                                   double* width, double* height,
+                                                   heif_item_id image_id);
+
+LIBHEIF_API
+struct heif_error heif_region_get_ellipse(const struct heif_region* region,
+                                          int32_t* x, int32_t* y,
+                                          uint32_t* radius_x, uint32_t* radius_y);
+
+LIBHEIF_API
+struct heif_error heif_region_get_ellipse_scaled(const struct heif_region* region,
+                                                 double* x, double* y,
+                                                 double* radius_x, double* radius_y,
+                                                 heif_item_id image_id);
+
+LIBHEIF_API
+int heif_region_get_polygon_num_points(const struct heif_region* region);
+
+// Point coordinates are stored in the output array 'pts'. This must have twice as many entries as there are points.
+// Each point is stored as consecutive x and y positions.
+LIBHEIF_API
+void heif_region_get_polygon_points(const struct heif_region* region,
+                                    int32_t* pts);
+
+LIBHEIF_API
+void heif_region_get_polygon_points_scaled(const struct heif_region* region,
+                                           double* pts,
+                                           heif_item_id image_id);
+
+LIBHEIF_API
+uint8_t heif_region_get_polygon_closed(const struct heif_region* region);
 
 #if 0
 struct heif_region_annotation;

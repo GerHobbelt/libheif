@@ -575,7 +575,7 @@ namespace heif {
 
     struct Property
     {
-      bool essential;
+      bool essential; // TODO: move this into PropertyBox and remove Property completely
       std::shared_ptr<Box> property;
     };
 
@@ -726,7 +726,7 @@ namespace heif {
     int get_rotation() const
     { return m_rotation; }
 
-    // Only multiples of 90 are allowed (0,90,180,270).
+    // Only these multiples of 90 are allowed: 0, 90, 180, 270.
     void set_rotation_ccw(int rot) { m_rotation = rot; }
 
   protected:
@@ -751,16 +751,10 @@ namespace heif {
       set_is_full_box(false);
     }
 
-    enum class MirrorDirection : uint8_t
-    {
-      Vertical = 0,
-      Horizontal = 1
-    };
-
-    MirrorDirection get_mirror_direction() const
+    heif_transform_mirror_direction get_mirror_direction() const
     { return m_axis; }
 
-    void set_mirror_direction(MirrorDirection dir) { m_axis=dir; }
+    void set_mirror_direction(heif_transform_mirror_direction dir) { m_axis=dir; }
 
     std::string dump(Indent&) const override;
 
@@ -770,7 +764,7 @@ namespace heif {
     Error write(StreamWriter& writer) const override;
 
   private:
-    MirrorDirection m_axis = MirrorDirection::Vertical;
+    heif_transform_mirror_direction m_axis = heif_transform_mirror_direction_vertical;
   };
 
 
@@ -1211,6 +1205,75 @@ namespace heif {
 
     uint32_t hSpacing = 1;
     uint32_t vSpacing = 1;
+
+    std::string dump(Indent&) const override;
+
+    Error write(StreamWriter& writer) const override;
+
+  protected:
+    Error parse(BitstreamRange& range) override;
+  };
+
+
+  class Box_lsel : public Box
+  {
+  public:
+    Box_lsel()
+    {
+      set_short_type(fourcc("lsel"));
+      set_is_full_box(false);
+    }
+
+    Box_lsel(const BoxHeader& hdr) : Box(hdr)
+    {}
+
+    uint16_t layer_id = 0;
+
+    std::string dump(Indent&) const override;
+
+    Error write(StreamWriter& writer) const override;
+
+  protected:
+    Error parse(BitstreamRange& range) override;
+  };
+
+
+  class Box_a1op : public Box
+  {
+  public:
+    Box_a1op()
+    {
+      set_short_type(fourcc("a1op"));
+      set_is_full_box(false);
+    }
+
+    Box_a1op(const BoxHeader& hdr) : Box(hdr)
+    {}
+
+    uint8_t op_index = 0;
+
+    std::string dump(Indent&) const override;
+
+    Error write(StreamWriter& writer) const override;
+
+  protected:
+    Error parse(BitstreamRange& range) override;
+  };
+
+
+  class Box_a1lx : public Box
+  {
+  public:
+    Box_a1lx()
+    {
+      set_short_type(fourcc("a1lx"));
+      set_is_full_box(false);
+    }
+
+    Box_a1lx(const BoxHeader& hdr) : Box(hdr)
+    {}
+
+    uint32_t layer_size[3]{};
 
     std::string dump(Indent&) const override;
 

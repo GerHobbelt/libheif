@@ -509,6 +509,18 @@ Error Box::read(BitstreamRange& range, std::shared_ptr<heif::Box>* result)
       box = std::make_shared<Box_pasp>(hdr);
       break;
 
+    case fourcc("lsel"):
+      box = std::make_shared<Box_lsel>(hdr);
+      break;
+
+    case fourcc("a1op"):
+      box = std::make_shared<Box_a1op>(hdr);
+      break;
+
+    case fourcc("a1lx"):
+      box = std::make_shared<Box_a1lx>(hdr);
+      break;
+
     case fourcc("clli"):
       box = std::make_shared<Box_clli>(hdr);
       break;
@@ -2020,6 +2032,118 @@ Error Box_pasp::write(StreamWriter& writer) const
 }
 
 
+Error Box_lsel::parse(BitstreamRange& range)
+{
+  layer_id = range.read16();
+
+  return range.get_error();
+}
+
+
+std::string Box_lsel::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+
+  sstr << indent << "layer_id: " << layer_id << "\n";
+
+  return sstr.str();
+}
+
+
+Error Box_lsel::write(StreamWriter& writer) const
+{
+  size_t box_start = reserve_box_header_space(writer);
+
+  writer.write16(layer_id);
+
+  prepend_header(writer, box_start);
+
+  return Error::Ok;
+}
+
+
+Error Box_a1op::parse(BitstreamRange& range)
+{
+  op_index = range.read8();
+
+  return range.get_error();
+}
+
+
+std::string Box_a1op::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+
+  sstr << indent << "op-index: " << ((int)op_index) << "\n";
+
+  return sstr.str();
+}
+
+
+Error Box_a1op::write(StreamWriter& writer) const
+{
+  size_t box_start = reserve_box_header_space(writer);
+
+  writer.write8(op_index);
+
+  prepend_header(writer, box_start);
+
+  return Error::Ok;
+}
+
+
+Error Box_a1lx::parse(BitstreamRange& range)
+{
+  uint8_t flags = range.read8();
+
+  for (int i=0;i<3;i++) {
+    if (flags & 1) {
+      layer_size[i] = range.read32();
+    }
+    else {
+      layer_size[i] = range.read16();
+    }
+  }
+
+  return range.get_error();
+}
+
+
+std::string Box_a1lx::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+
+  sstr << indent << "layer-sizes: [" << layer_size[0] << "," << layer_size[1] << "," << layer_size[2] << "]\n";
+
+  return sstr.str();
+}
+
+
+Error Box_a1lx::write(StreamWriter& writer) const
+{
+  size_t box_start = reserve_box_header_space(writer);
+
+  bool large = (layer_size[0] > 0xFFFF || layer_size[1] > 0xFFFF || layer_size[2] > 0xFFFF);
+  writer.write8(large ? 1 : 0);
+
+  for (int i=0;i<3;i++) {
+    if (large) {
+      writer.write32(layer_size[i]);
+    }
+    else {
+      writer.write16((uint16_t)layer_size[i]);
+    }
+  }
+
+  prepend_header(writer, box_start);
+
+  return Error::Ok;
+}
+
+
 Error Box_clli::parse(BitstreamRange& range)
 {
   //parse_full_box_header(range);
@@ -2468,10 +2592,10 @@ Error Box_imir::parse(BitstreamRange& range)
 
   uint8_t axis = range.read8();
   if (axis & 1) {
-    m_axis = MirrorDirection::Horizontal;
+    m_axis = heif_transform_mirror_direction_horizontal;
   }
   else {
-    m_axis = MirrorDirection::Vertical;
+    m_axis = heif_transform_mirror_direction_vertical;
   }
 
   return range.get_error();
@@ -2482,7 +2606,7 @@ Error Box_imir::write(StreamWriter& writer) const
 {
   size_t box_start = reserve_box_header_space(writer);
 
-  writer.write8(m_axis == MirrorDirection::Horizontal ? 1 : 0);
+  writer.write8(m_axis);
 
   prepend_header(writer, box_start);
 
@@ -2497,10 +2621,10 @@ std::string Box_imir::dump(Indent& indent) const
 
   sstr << indent << "mirror direction: ";
   switch (m_axis) {
-    case MirrorDirection::Vertical:
+    case heif_transform_mirror_direction_vertical:
       sstr << "vertical\n";
       break;
-    case MirrorDirection::Horizontal:
+    case heif_transform_mirror_direction_horizontal:
       sstr << "horizontal\n";
       break;
   }
