@@ -29,8 +29,8 @@
 #include <memory>
 #include "encoder_aom.h"
 
-#include <aom/aom_encoder.h>
-#include <aom/aomcx.h>
+#include "aom/aom_encoder.h"
+#include "aom/aomcx.h"
 #include <mutex>
 
 // Detect whether the aom_codec_set_option() function is available.

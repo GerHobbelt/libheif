@@ -52,6 +52,10 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 # Create the compile command database for clang by default
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
+set(CMAKE_BUILD_TYPE
+        "MinSizeRel"
+        CACHE STRING "Build type: Debug, Release, RelWithDebInfo or MinSizeRel"
+              FORCE)
 option(BUILD_SHARED_LIBS "Build shared libraries" ON)
 
 include(CheckCXXCompilerFlag)
@@ -101,14 +105,14 @@ endmacro()
 
 # libde265
 
-plugin_option(LIBDE265 "libde265 HEVC decoder" ON OFF)
+plugin_option(LIBDE265 "libde265 HEVC decoder" ON ON)
 if (WITH_LIBDE265)
     find_package(LIBDE265)
 endif()
 
 # x265
 
-plugin_option(X265 "x265 HEVC encoder" ON OFF)
+plugin_option(X265 "x265 HEVC encoder" ON ON)
 if (WITH_X265)
     find_package(X265)
 endif()
@@ -127,15 +131,15 @@ endif ()
 
 # dav1d
 
-plugin_option(DAV1D "Dav1d AV1 decoder" OFF ON)
+plugin_option(DAV1D "Dav1d AV1 decoder" ON ON)
 if (WITH_DAV1D)
     find_package(DAV1D)
 endif()
 
 # aom
 
-plugin_option(AOM_DECODER "AOM AV1 decoder" ON OFF)
-plugin_option(AOM_ENCODER "AOM AV1 encoder" ON OFF)
+plugin_option(AOM_DECODER "AOM AV1 decoder" OFF OFF)
+plugin_option(AOM_ENCODER "AOM AV1 encoder" ON ON)
 if (WITH_AOM_ENCODER OR WITH_AOM_DECODER)
     find_package(AOM)
 endif()
@@ -283,12 +287,12 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/libheif.pc
 
 # ---
 
-option(WITH_EXAMPLES "Build examples" ON)
+option(WITH_EXAMPLES "Build examples" OFF)
 option(WITH_GDK_PIXBUF "Build gdk-pixbuf plugin" ON)
 
 option(WITH_REDUCED_VISIBILITY "Reduced symbol visibility in library" ON)
 
-option(WITH_DEFLATE_HEADER_COMPRESSION OFF)
+option(WITH_DEFLATE_HEADER_COMPRESSION ON)
 option(ENABLE_MULTITHREADING_SUPPORT "Switch off for platforms without multithreading support" ON)
 option(ENABLE_PARALLEL_TILE_DECODING "Will launch multiple decoders to decode tiles in parallel (requires ENABLE_MULTITHREADING_SUPPORT)" ON)
 
@@ -327,7 +331,7 @@ endif (DOXYGEN_FOUND)
 
 # --- Testing
 
-option(BUILD_TESTING "" ON)
+option(BUILD_TESTING "" OFF)
 include(CTest)
 if(BUILD_TESTING)
     # TODO: fix tests on windows.
