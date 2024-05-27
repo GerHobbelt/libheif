@@ -1,6 +1,6 @@
 /*
  * HEIF codec.
- * Copyright (c) 2017 struktur AG, Dirk Farin <farin@struktur.de>
+ * Copyright (c) 2017 Dirk Farin <dirk.farin@gmail.com>
  *
  * This file is part of libheif.
  *
@@ -58,8 +58,8 @@
 #include "libheif/plugins/encoder_svt.h"
 #endif
 
-#if HAVE_FFMPEG_DECODER
-#include "libheif/plugins/heif_decoder_ffmpeg.h"
+#if HAVE_FFMPEG_HEVC_DECODER
+#include "libheif/plugins/decoder_ffmpeg_hevc.h"
 #endif
 
 #if WITH_UNCOMPRESSED_CODEC
@@ -151,7 +151,7 @@ void register_default_plugins()
   register_encoder(get_encoder_plugin_svt());
 #endif
 
-#if HAVE_FFMPEG_DECODER
+#if HAVE_FFMPEG_HEVC_DECODER
   register_decoder(get_decoder_plugin_ffmpeg());
 #endif
 
@@ -191,6 +191,8 @@ void register_decoder(const heif_decoder_plugin* decoder_plugin)
 
 const struct heif_decoder_plugin* get_decoder(enum heif_compression_format type, const char* name_id)
 {
+  load_plugins_if_not_initialized_yet();
+
   int highest_priority = 0;
   const struct heif_decoder_plugin* best_plugin = nullptr;
 
@@ -229,6 +231,8 @@ void register_encoder(const heif_encoder_plugin* encoder_plugin)
 
 const struct heif_encoder_plugin* get_encoder(enum heif_compression_format type)
 {
+  load_plugins_if_not_initialized_yet();
+
   auto filtered_encoder_descriptors = get_filtered_encoder_descriptors(type, nullptr);
   if (filtered_encoder_descriptors.size() > 0) {
     return filtered_encoder_descriptors[0]->plugin;

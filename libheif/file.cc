@@ -1,6 +1,6 @@
 /*
  * HEIF codec.
- * Copyright (c) 2017 struktur AG, Dirk Farin <farin@struktur.de>
+ * Copyright (c) 2017 Dirk Farin <dirk.farin@gmail.com>
  *
  * This file is part of libheif.
  *
@@ -21,6 +21,7 @@
 #include "file.h"
 #include "libheif/box.h"
 #include "libheif/heif.h"
+#include "libheif/heif_properties.h"
 #include "libheif/jpeg2000.h"
 #include "libheif/jpeg.h"
 #include "libheif/vvc.h"
