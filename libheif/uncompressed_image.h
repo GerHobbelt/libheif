@@ -50,6 +50,10 @@ public:
   {
     uint16_t component_type;
     std::string component_type_uri;
+
+    std::string get_component_type_name() const { return get_component_type_name(component_type); }
+
+    static std::string get_component_type_name(uint16_t type);
   };
 
   const std::vector<Component>& get_components() const { return m_components; }
@@ -83,7 +87,7 @@ public:
   struct Component
   {
     uint16_t component_index;
-    uint8_t component_bit_depth;
+    uint16_t component_bit_depth; // range [1..256]
     uint8_t component_format;
     uint8_t component_align_size;
   };

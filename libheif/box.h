@@ -71,6 +71,9 @@ public:
   // may only use values up to int32_t maximum
   Fraction(uint32_t num, uint32_t den);
 
+  // Values will be reduced until they fit into int32_t.
+  Fraction(int64_t num, int64_t den);
+
   Fraction operator+(const Fraction&) const;
 
   Fraction operator-(const Fraction&) const;
@@ -466,6 +469,8 @@ public:
 
   Error write(StreamWriter& writer) const override;
 
+  const std::string& get_item_uri_type() const { return m_item_uri_type; }
+
 protected:
   Error parse(BitstreamRange& range) override;
 
@@ -757,7 +762,7 @@ public:
 
   std::vector<Reference> get_references_from(heif_item_id itemID) const;
 
-  void add_reference(heif_item_id from_id, uint32_t type, const std::vector<heif_item_id>& to_ids);
+  void add_references(heif_item_id from_id, uint32_t type, const std::vector<heif_item_id>& to_ids);
 
 protected:
   Error parse(BitstreamRange& range) override;

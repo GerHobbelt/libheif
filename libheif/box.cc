@@ -70,56 +70,74 @@ Fraction::Fraction(uint32_t num, uint32_t den)
   *this = Fraction(int32_t(num), int32_t(den));
 }
 
+Fraction::Fraction(int64_t num, int64_t den)
+{
+  while (num < std::numeric_limits<int32_t>::min() || num > std::numeric_limits<int32_t>::max() ||
+         den < std::numeric_limits<int32_t>::min() || den > std::numeric_limits<int32_t>::max()) {
+    num = (num + (num>=0 ? 1 : -1)) / 2;
+    den = (den + (den>=0 ? 1 : -1)) / 2;
+  }
+
+  numerator = static_cast<int32_t>(num);
+  denominator = static_cast<int32_t>(den);
+}
+
 Fraction Fraction::operator+(const Fraction& b) const
 {
   if (denominator == b.denominator) {
-    return Fraction{numerator + b.numerator, denominator};
+    int64_t n = numerator + b.numerator;
+    int64_t d = denominator;
+    return Fraction{n,d};
   }
   else {
-    return Fraction{numerator * b.denominator + b.numerator * denominator,
-                    denominator * b.denominator};
+    int64_t n = int64_t{numerator} * b.denominator + int64_t{b.numerator} * denominator;
+    int64_t d = int64_t{denominator} * b.denominator;
+    return Fraction{n,d};
   }
 }
 
 Fraction Fraction::operator-(const Fraction& b) const
 {
   if (denominator == b.denominator) {
-    return Fraction{numerator - b.numerator, denominator};
+    int64_t n = numerator - b.numerator;
+    int64_t d = denominator;
+    return Fraction{n,d};
   }
   else {
-    return Fraction{numerator * b.denominator - b.numerator * denominator,
-                    denominator * b.denominator};
+    int64_t n = int64_t{numerator} * b.denominator - int64_t{b.numerator} * denominator;
+    int64_t d = int64_t{denominator} * b.denominator;
+    return Fraction{n,d};
   }
 }
 
 Fraction Fraction::operator+(int v) const
 {
-  return Fraction{numerator + v * denominator, denominator};
+  return Fraction{numerator + v * int64_t(denominator), int64_t(denominator)};
 }
 
 Fraction Fraction::operator-(int v) const
 {
-  return Fraction{numerator - v * denominator, denominator};
+  return Fraction{numerator - v * int64_t(denominator), int64_t(denominator)};
 }
 
 Fraction Fraction::operator/(int v) const
 {
-  return Fraction{numerator, denominator * v};
+  return Fraction{int64_t(numerator), int64_t(denominator) * v};
 }
 
-int Fraction::round_down() const
+int32_t Fraction::round_down() const
 {
   return numerator / denominator;
 }
 
-int Fraction::round_up() const
+int32_t Fraction::round_up() const
 {
-  return (numerator + denominator - 1) / denominator;
+  return int32_t((numerator + int64_t(denominator) - 1) / denominator);
 }
 
-int Fraction::round() const
+int32_t Fraction::round() const
 {
-  return (numerator + denominator / 2) / denominator;
+  return int32_t((numerator + int64_t(denominator) / 2) / denominator);
 }
 
 bool Fraction::is_valid() const
@@ -2605,6 +2623,49 @@ Error Box_iref::parse(BitstreamRange& range)
   }
 
 
+  // --- check number of total refs
+
+  size_t nTotalRefs = 0;
+  for (const auto& ref : m_references) {
+    nTotalRefs += ref.to_item_ID.size();
+  }
+
+  if (nTotalRefs > MAX_IREF_REFERENCES) {
+    return Error(heif_error_Memory_allocation_error, heif_suberror_Security_limit_exceeded,
+                 "Number of iref references exceeds security limit.");
+  }
+
+  // --- check for duplicate references
+
+  for (const auto& ref : m_references) {
+    std::set<heif_item_id> to_ids;
+    for (const auto to_id : ref.to_item_ID) {
+      if (to_ids.find(to_id) == to_ids.end()) {
+        to_ids.insert(to_id);
+      }
+      else {
+        return Error(heif_error_Invalid_input,
+                     heif_suberror_Unspecified,
+                     "'iref' has double references");
+      }
+    }
+  }
+
+
+#if 0
+  // Note: This input sanity check does not work as expected.
+  // Its idea was to prevent infinite recursions while decoding when the input file
+  // contains cyclic references. However, apparently there are cases where cyclic
+  // references are actually allowed, like with images that have premultiplied alpha channels:
+  // | Box: iref -----
+  // | size: 40   (header size: 12)
+  // | reference with type 'auxl' from ID: 2 to IDs: 1
+  // | reference with type 'prem' from ID: 1 to IDs: 2
+  //
+  // TODO: implement the infinite recursion detection in a different way. E.g. by passing down
+  //       the already processed item-ids while decoding an image and checking whether the current
+  //       item has already been decoded before.
+
   // --- check for cyclic references
 
   for (const auto& ref : m_references) {
@@ -2628,7 +2689,7 @@ Error Box_iref::parse(BitstreamRange& range)
           // Otherwise, put that ID into the 'todo' set.
 
           for (const auto& succ_ref_id : succ_ref.to_item_ID) {
-            if (reached_ids.find(succ_ref_id)  != reached_ids.end()) {
+            if (reached_ids.find(succ_ref_id) != reached_ids.end()) {
               return Error(heif_error_Invalid_input,
                            heif_suberror_Unspecified,
                            "'iref' has cyclic references");
@@ -2640,6 +2701,7 @@ Error Box_iref::parse(BitstreamRange& range)
       }
     }
   }
+#endif
 
   return range.get_error();
 }
@@ -2753,7 +2815,7 @@ std::vector<uint32_t> Box_iref::get_references(uint32_t itemID, uint32_t ref_typ
 }
 
 
-void Box_iref::add_reference(heif_item_id from_id, uint32_t type, const std::vector<heif_item_id>& to_ids)
+void Box_iref::add_references(heif_item_id from_id, uint32_t type, const std::vector<heif_item_id>& to_ids)
 {
   Reference ref;
   ref.header.set_short_type(type);

@@ -294,7 +294,7 @@ struct heif_error heif_region_item_add_region_referenced_mask(struct heif_region
 struct heif_error heif_region_item_add_region_inline_mask_data(struct heif_region_item* item,
                                                                int32_t x, int32_t y,
                                                                uint32_t width, uint32_t height,
-                                                               uint8_t* mask_data,
+                                                               const uint8_t* mask_data,
                                                                size_t mask_data_len,
                                                                struct heif_region** out_region)
 {
@@ -342,7 +342,7 @@ struct heif_error heif_region_item_add_region_inline_mask(struct heif_region_ite
   for (uint32_t y = 0; y < mask_height; y++) {
     for (uint32_t x = 0; x < mask_width; x++) {
       uint8_t mask_bit = p[y * stride + x] & 0x80; // use high-order bit of the 8-bit mask value as binary mask value
-      region->mask_data.data()[pixel_index/8] |= (mask_bit >> (pixel_index % 8));
+      region->mask_data.data()[pixel_index/8] |= uint8_t(mask_bit >> (pixel_index % 8));
 
       pixel_index++;
     }
@@ -394,8 +394,7 @@ struct heif_error heif_region_get_point(const struct heif_region* region, int32_
 }
 
 
-struct heif_error heif_region_get_point_transformed(const struct heif_region* region, double* x, double* y,
-                                                    heif_item_id image_id)
+struct heif_error heif_region_get_point_transformed(const struct heif_region* region, heif_item_id image_id, double* x, double* y)
 {
   if (!x || !y) {
     return heif_error_invalid_parameter_value;
@@ -435,9 +434,9 @@ struct heif_error heif_region_get_rectangle(const struct heif_region* region,
 
 
 struct heif_error heif_region_get_rectangle_transformed(const struct heif_region* region,
+                                                        heif_item_id image_id,
                                                         double* x, double* y,
-                                                        double* width, double* height,
-                                                        heif_item_id image_id)
+                                                        double* width, double* height)
 {
   const std::shared_ptr<RegionGeometry_Rectangle> rect = std::dynamic_pointer_cast<RegionGeometry_Rectangle>(region->region);
   if (rect) {
@@ -477,9 +476,9 @@ struct heif_error heif_region_get_ellipse(const struct heif_region* region,
 
 
 struct heif_error heif_region_get_ellipse_transformed(const struct heif_region* region,
+                                                      heif_item_id image_id,
                                                       double* x, double* y,
-                                                      double* radius_x, double* radius_y,
-                                                      heif_item_id image_id)
+                                                      double* radius_x, double* radius_y)
 {
   const std::shared_ptr<RegionGeometry_Ellipse> ellipse = std::dynamic_pointer_cast<RegionGeometry_Ellipse>(region->region);
   if (ellipse) {
@@ -578,12 +577,12 @@ static struct heif_error heif_region_get_poly_points_scaled(const struct heif_re
 }
 
 
-struct heif_error heif_region_get_polygon_points_transformed(const struct heif_region* region, double* pts, heif_item_id image_id)
+struct heif_error heif_region_get_polygon_points_transformed(const struct heif_region* region, heif_item_id image_id, double* pts)
 {
   return heif_region_get_poly_points_scaled(region, pts, image_id);
 }
 
-struct heif_error heif_region_get_polyline_points_transformed(const struct heif_region* region, double* pts, heif_item_id image_id)
+struct heif_error heif_region_get_polyline_points_transformed(const struct heif_region* region, heif_item_id image_id, double* pts)
 {
   return heif_region_get_poly_points_scaled(region, pts, image_id);
 }
@@ -682,7 +681,7 @@ static struct heif_error heif_region_get_inline_mask_image(const struct heif_reg
       for (uint32_t x = 0; x < width; x++)
       {
         uint64_t mask_byte = pixel_index / 8;
-        uint8_t pixel_bit = 0x80U >> (pixel_index % 8);
+        uint8_t pixel_bit = uint8_t(0x80U >> (pixel_index % 8));
 
         p[y * stride + x] = (mask_data[mask_byte] & pixel_bit) ? 255 : 0;
 

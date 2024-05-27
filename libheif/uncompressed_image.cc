@@ -51,6 +51,13 @@ enum heif_uncompressed_component_type
   component_type_key_black = 16
 };
 
+bool is_predefined_component_type(uint16_t type)
+{
+  // check whether the component type can be mapped to heif_uncompressed_component_type and we have a name defined for
+  // it in sNames_uncompressed_component_type.
+  return (type >= 0 && type <= 16);
+}
+
 static std::map<heif_uncompressed_component_type, const char*> sNames_uncompressed_component_type{
     {component_type_monochrome,   "monochrome"},
     {component_type_Y,            "Y"},
@@ -78,6 +85,11 @@ enum heif_uncompressed_component_format
   component_format_complex = 2,
 };
 
+bool is_valid_component_format(uint8_t format)
+{
+  return format <= 2;
+}
+
 static std::map<heif_uncompressed_component_format, const char*> sNames_uncompressed_component_format{
     {component_format_unsigned, "unsigned"},
     {component_format_float,    "float"},
@@ -92,6 +104,11 @@ enum heif_uncompressed_sampling_type
   sampling_type_420 = 2,
   sampling_type_411 = 3
 };
+
+bool is_valid_sampling_type(uint8_t sampling)
+{
+  return sampling <= 3;
+}
 
 static std::map<heif_uncompressed_sampling_type, const char*> sNames_uncompressed_sampling_type{
     {sampling_type_no_subsampling, "no subsampling"},
@@ -109,6 +126,11 @@ enum heif_uncompressed_interleave_type
   interleave_type_tile_component = 4,
   interleave_type_multi_y = 5
 };
+
+bool is_valid_interleave_type(uint8_t sampling)
+{
+  return sampling <= 5;
+}
 
 static std::map<heif_uncompressed_interleave_type, const char*> sNames_uncompressed_interleave_type{
     {interleave_type_component,      "component"},
@@ -150,13 +172,29 @@ Error Box_cmpd::parse(BitstreamRange& range)
   return range.get_error();
 }
 
+std::string Box_cmpd::Component::get_component_type_name(uint16_t component_type)
+{
+  std::stringstream sstr;
+
+  if (is_predefined_component_type(component_type)) {
+    sstr << get_name(heif_uncompressed_component_type(component_type), sNames_uncompressed_component_type) << "\n";
+  }
+  else {
+    sstr << "0x" << std::hex << component_type << std::dec << "\n";
+  }
+
+  return sstr.str();
+}
+
+
 std::string Box_cmpd::dump(Indent& indent) const
 {
   std::ostringstream sstr;
   sstr << Box::dump(indent);
 
   for (const auto& component : m_components) {
-    sstr << indent << "component_type: " << get_name(heif_uncompressed_component_type(component.component_type), sNames_uncompressed_component_type) << "\n";
+    sstr << indent << "component_type: " << component.get_component_type_name() << "\n";
+
     if (component.component_type >= 0x8000) {
       sstr << indent << "| component_type_uri: " << component.component_type_uri << "\n";
     }
@@ -192,15 +230,25 @@ Error Box_uncC::parse(BitstreamRange& range)
   for (unsigned int i = 0; i < component_count && !range.error() && !range.eof(); i++) {
     Component component;
     component.component_index = range.read16();
-    component.component_bit_depth = range.read8() + 1;
+    component.component_bit_depth = uint16_t(range.read8() + 1);
     component.component_format = range.read8();
     component.component_align_size = range.read8();
     m_components.push_back(component);
+
+    if (!is_valid_component_format(component.component_format)) {
+      return Error{heif_error_Invalid_input, heif_suberror_Invalid_parameter_value, "Invalid component format"};
+    }
   }
 
   m_sampling_type = range.read8();
+  if (!is_valid_sampling_type(m_sampling_type)) {
+    return Error{heif_error_Invalid_input, heif_suberror_Invalid_parameter_value, "Invalid sampling type"};
+  }
 
   m_interleave_type = range.read8();
+  if (!is_valid_interleave_type(m_interleave_type)) {
+    return Error{heif_error_Invalid_input, heif_suberror_Invalid_parameter_value, "Invalid interleave type"};
+  }
 
   m_block_size = range.read8();
 
@@ -281,8 +329,12 @@ Error Box_uncC::write(StreamWriter& writer) const
   writer.write32(m_profile);
   writer.write32((uint32_t) m_components.size());
   for (const auto& component : m_components) {
+    if (component.component_bit_depth < 1 || component.component_bit_depth > 256) {
+      return {heif_error_Invalid_input, heif_suberror_Invalid_parameter_value, "component bit-depth out of range [1..256]"};
+    }
+
     writer.write16(component.component_index);
-    writer.write8(component.component_bit_depth - 1);
+    writer.write8(uint8_t(component.component_bit_depth - 1));
     writer.write8(component.component_format);
     writer.write8(component.component_align_size);
   }
@@ -290,11 +342,11 @@ Error Box_uncC::write(StreamWriter& writer) const
   writer.write8(m_interleave_type);
   writer.write8(m_block_size);
   uint8_t flags = 0;
-  flags |= (m_components_little_endian ? 1 : 0) << 7;
-  flags |= (m_block_pad_lsb ? 1 : 0) << 6;
-  flags |= (m_block_little_endian ? 1 : 0) << 5;
-  flags |= (m_block_reversed ? 1 : 0) << 4;
-  flags |= (m_pad_unknown ? 1 : 0) << 3;
+  flags |= (m_components_little_endian ? 0x80 : 0);
+  flags |= (m_block_pad_lsb ? 0x40 : 0);
+  flags |= (m_block_little_endian ? 0x20 : 0);
+  flags |= (m_block_reversed ? 0x10 : 0);
+  flags |= (m_pad_unknown ? 0x08 : 0);
   writer.write8(flags);
   writer.write32(m_pixel_size);
   writer.write32(m_row_align_size);
@@ -414,6 +466,10 @@ static Error get_heif_chroma_uncompressed(std::shared_ptr<Box_uncC>& uncC, std::
   for (Box_uncC::Component component : uncC->get_components()) {
     uint16_t component_index = component.component_index;
     uint16_t component_type = cmpd->get_components()[component_index].component_type;
+
+    if (component_type >= 16) {
+      return { heif_error_Unsupported_feature, heif_suberror_Invalid_parameter_value, "a component_type >= 16 is not supported"};
+    }
 
     componentSet |= (1 << component_type);
   }
