@@ -40,6 +40,11 @@
 #include "hdr_sdr.h"
 #include "chroma_sampling.h"
 
+#if ENABLE_MULTITHREADING_SUPPORT
+
+#include <mutex>
+
+#endif
 
 #define DEBUG_ME 0
 #define DEBUG_PIPELINE_CREATION 0
@@ -203,9 +208,12 @@ std::ostream& operator<<(std::ostream& ostr, const ColorState& state)
 
 std::vector<std::shared_ptr<ColorConversionOperation>> ColorConversionPipeline::m_operation_pool;
 
-
 void ColorConversionPipeline::init_ops()
 {
+#if ENABLE_MULTITHREADING_SUPPORT
+  static std::mutex init_ops_mutex;
+  std::lock_guard<std::mutex> lock(init_ops_mutex);
+#endif
   if (!m_operation_pool.empty()) {
     return;
   }
