@@ -1179,7 +1179,7 @@ Error HeifContext::Image::get_preferred_decoding_colorspace(heif_colorspace* out
   // TODO: this should be codec specific. JPEG-2000, for example, can use RGB internally.
 
   *out_colorspace = heif_colorspace_YCbCr;
-  *out_chroma = heif_chroma_420;
+  *out_chroma = heif_chroma_undefined;
 
   if (auto hvcC = m_heif_context->m_heif_file->get_property<Box_hvcC>(id)) {
     *out_chroma = (heif_chroma)(hvcC->get_configuration().chroma_format);
@@ -1187,8 +1187,9 @@ Error HeifContext::Image::get_preferred_decoding_colorspace(heif_colorspace* out
   else if (auto av1C = m_heif_context->m_heif_file->get_property<Box_av1C>(id)) {
     *out_chroma = (heif_chroma)(av1C->get_configuration().get_heif_chroma());
   }
-  else {
-    *out_chroma = heif_chroma_undefined;
+  else if (auto j2kH = m_heif_context->m_heif_file->get_property<Box_j2kH>(id)) {
+    JPEG2000_SIZ_segment siz = jpeg2000_get_SIZ_segment(*m_heif_context->m_heif_file, id);
+    *out_chroma = siz.get_chroma_format();
   }
 
   return err;
@@ -2371,15 +2372,21 @@ void HeifContext::write_image_metadata(std::shared_ptr<HeifPixelImage> src_image
 
 
 static bool nclx_profile_matches_spec(heif_colorspace colorspace,
-                                      const std::shared_ptr<const color_profile_nclx>& image_nclx,
+                                      std::shared_ptr<const color_profile_nclx> image_nclx,
                                       const struct heif_color_profile_nclx* spec_nclx)
 {
   if (colorspace != heif_colorspace_YCbCr) {
     return true;
   }
 
-  if (!image_nclx || !spec_nclx) {
+  // Do target specification -> always matches
+  if (!spec_nclx) {
     return true;
+  }
+
+  if (!image_nclx) {
+    // if no input nclx is specified, compare against default one
+    image_nclx = std::make_shared<color_profile_nclx>();
   }
 
   if (image_nclx->get_full_range_flag() != spec_nclx->full_range_flag) {
@@ -2790,12 +2797,17 @@ Error HeifContext::encode_image_as_jpeg2000(const std::shared_ptr<HeifPixelImage
   // ---begin---
   heif_colorspace colorspace = image->get_colorspace();
   heif_chroma chroma = image->get_chroma_format();
+
+  /*
   auto color_profile = image->get_color_profile_nclx();
   if (!color_profile) {
     color_profile = std::make_shared<color_profile_nclx>();
   }
   auto nclx_profile = std::dynamic_pointer_cast<const color_profile_nclx>(color_profile);
+*/
 
+  auto target_nclx_profile = std::make_shared<color_profile_nclx>();
+  target_nclx_profile->set_from_heif_color_profile_nclx(options.output_nclx_profile);
 
   if (encoder->plugin->plugin_api_version >= 2) {
     encoder->plugin->query_input_colorspace2(encoder->encoder, &colorspace, &chroma);
@@ -2806,10 +2818,10 @@ Error HeifContext::encode_image_as_jpeg2000(const std::shared_ptr<HeifPixelImage
 
   std::shared_ptr<HeifPixelImage> src_image;
   if (colorspace != image->get_colorspace() ||
-      chroma != image->get_chroma_format()) {
-    // @TODO: use color profile when converting
+      chroma != image->get_chroma_format() ||
+      !nclx_profile_matches_spec(colorspace, image->get_color_profile_nclx(), options.output_nclx_profile)) {
     int output_bpp = 0; // same as input
-    src_image = convert_colorspace(image, colorspace, chroma, nclx_profile,
+    src_image = convert_colorspace(image, colorspace, chroma, target_nclx_profile,
                                    output_bpp, options.color_conversion_options);
     if (!src_image) {
       return Error(heif_error_Unsupported_feature, heif_suberror_Unsupported_color_conversion);
@@ -2850,9 +2862,7 @@ Error HeifContext::encode_image_as_jpeg2000(const std::shared_ptr<HeifPixelImage
   m_heif_file->add_ispe_property(image_id, image->get_width(), image->get_height());
 
   //Add 'colr' Property
-  //TODO: Use the correct color profile instead of default
-  auto profile = std::make_shared<const color_profile_nclx>();
-  m_heif_file->set_color_profile(image_id, profile);
+  m_heif_file->set_color_profile(image_id, target_nclx_profile);
 
   //Add 'j2kH' Property
   auto j2kH = m_heif_file->add_j2kH_property(image_id);
@@ -2862,7 +2872,7 @@ Error HeifContext::encode_image_as_jpeg2000(const std::shared_ptr<HeifPixelImage
   cdef->set_channels(src_image->get_colorspace());
   j2kH->append_child_box(cdef);
 
-  //write_image_metadata(src_image, image_id);   // TODO: currently writes invalid bpp=255
+  write_image_metadata(src_image, image_id);
 
   return Error::Ok;
 }
