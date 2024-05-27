@@ -3833,6 +3833,7 @@ Error Box_udes::write(StreamWriter& writer) const
   return Error::Ok;
 }
 
+
 std::string Box_j2kH::dump(Indent& indent) const {
   std::string s = "TODO - box.cc - j2kH::dump()\n"; 
   return s;
@@ -3886,7 +3887,7 @@ Error Box_cdef::write(StreamWriter& writer) const {
 
 
 Error Box_cdef::parse(BitstreamRange& range) {
-  parse_full_box_header(range);
+  // parse_full_box_header(range);
 
   uint16_t channel_count = range.read16();
 
@@ -3900,6 +3901,7 @@ Error Box_cdef::parse(BitstreamRange& range) {
 
   return range.get_error();
 }
+
 
 void Box_cdef::set_channels(heif_chroma chroma) {
 
@@ -3927,3 +3929,4 @@ void Box_cdef::set_channels(heif_chroma chroma) {
     break;
   }
 }
+

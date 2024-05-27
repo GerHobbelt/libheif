@@ -4,7 +4,6 @@ macro(plugin_compilation name varName optionName defineName)
         if (NOT "${${varName}_LIBRARY_DIRS}" STREQUAL "")
             set(${varName}_LINKDIR "-L${${varName}_LIBRARY_DIRS}")
         endif ()
-        # message("-------------WITH_${optionName}_PLUGIN = ${WITH_${optionName}_PLUGIN}")
 
         if (PLUGIN_LOADING_SUPPORTED_AND_ENABLED AND WITH_${optionName}_PLUGIN)
             message("Compiling '" ${name} "' as dynamic plugin")
@@ -69,10 +68,6 @@ plugin_compilation(svtenc SvtEnc SvtEnc SvtEnc)
 set(RAV1E_sources encoder_rav1e.cc encoder_rav1e.h)
 set(RAV1E_extra_plugin_sources ../box.cc ../error.cc)
 plugin_compilation(rav1e RAV1E RAV1E RAV1E)
-
-set(OpenJPEG_sources heif_encoder_openjpeg.cc heif_encoder_openjpeg.h)
-set(OpenJPEG_extra_plugin_sources ../error.cc ../common_utils.cc ../common_utils.h)
-plugin_compilation(OpenJPEG OPENJPEG OpenJPEG   OPENJPEG)
 
 set(JPEG_DECODER_sources decoder_jpeg.cc decoder_jpeg.h)
 set(JPEG_DECODER_extra_plugin_sources)

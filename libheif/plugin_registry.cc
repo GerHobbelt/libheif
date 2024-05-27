@@ -133,16 +133,16 @@ void register_default_plugins()
   register_encoder(get_encoder_plugin_svt());
 #endif
 
-#if HAVE_OPENJPEG
-  heif::register_encoder(get_encoder_plugin_openjpeg());
-#endif
-
 #if HAVE_JPEG_DECODER
   register_decoder(get_decoder_plugin_jpeg());
 #endif
 
 #if HAVE_JPEG_ENCODER
   register_encoder(get_encoder_plugin_jpeg());
+#endif
+
+#if HAVE_OPENJPEG
+  heif::register_encoder(get_encoder_plugin_openjpeg());
 #endif
 
 #if HAVE_OPENJPEG_ENCODER
