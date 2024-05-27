@@ -1,6 +1,7 @@
 /*
- * HEIF JPEG 2000 codec.
- * Copyright (c) 2023 Devon Sookhoo <devonsookhoo14gmail.com>
+ * OpenJPEG codec.
+ * Copyright (c) 2023 Devon Sookhoo
+ * Copyright (c) 2023 Dirk Farin <farin@struktur.de>
  *
  * This file is part of libheif.
  *
