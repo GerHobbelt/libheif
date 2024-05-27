@@ -30,6 +30,7 @@
 #include "plugin_registry.h"
 #include "error.h"
 #include "bitstream.h"
+#include "init.h"
 #include <set>
 #include <limits>
 
@@ -58,7 +59,7 @@
 #include <cassert>
 
 
-static struct heif_error error_Ok = {heif_error_Ok, heif_suberror_Unspecified, kSuccess};
+const struct heif_error heif_error_success = {heif_error_Ok, heif_suberror_Unspecified, kSuccess};
 static struct heif_error error_unsupported_parameter = {heif_error_Usage_error,
                                                         heif_suberror_Unsupported_parameter,
                                                         "Unsupported encoder parameter"};
@@ -333,7 +334,7 @@ struct heif_error heif_list_compatible_brands(const uint8_t* data, int len, heif
     (*out_brands)[i] = brands[i];
   }
 
-  return {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
+  return heif_error_success;
 }
 
 
@@ -436,6 +437,8 @@ const char* heif_get_file_mime_type(const uint8_t* data, int len)
 
 heif_context* heif_context_alloc()
 {
+  load_plugins_if_not_initialized_yet();
+
   struct heif_context* ctx = new heif_context;
   ctx->context = std::make_shared<HeifContext>();
 
@@ -603,7 +606,7 @@ struct heif_error heif_context_get_image_handle(struct heif_context* ctx,
   (*imgHdl)->image = image;
   (*imgHdl)->context = ctx->context;
 
-  return {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
+  return heif_error_success;
 }
 
 
@@ -715,7 +718,7 @@ struct heif_error heif_image_handle_get_auxiliary_type(const struct heif_image_h
   strcpy(buf, auxType.c_str());
   *out_type = buf;
 
-  return {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
+  return heif_error_success;
 }
 
 
@@ -822,7 +825,7 @@ struct heif_error heif_image_handle_get_preferred_decoding_colorspace(const stru
     return err.error_struct(image_handle->image.get());
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -1086,8 +1089,7 @@ struct heif_error heif_image_create(int width, int height,
 
   *image = img;
 
-  struct heif_error err = {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
-  return err;
+  return heif_error_success;
 }
 
 int heif_image_get_decoding_warnings(struct heif_image* image,
@@ -1205,7 +1207,7 @@ struct heif_error heif_mastering_display_colour_volume_decode(const struct heif_
     out->min_display_mastering_luminance = in->min_display_mastering_luminance * 0.0001;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -1301,7 +1303,7 @@ heif_error heif_image_crop(struct heif_image* img,
 
   img->image = out_img;
 
-  return heif_error{heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
+  return heif_error_success;
 }
 
 
@@ -1333,8 +1335,7 @@ struct heif_error heif_image_add_plane(struct heif_image* image,
     return err;
   }
   else {
-    struct heif_error err = {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
-    return err;
+    return heif_error_success;
   }
 }
 
@@ -1395,7 +1396,7 @@ struct heif_error heif_image_extend_padding_to_size(struct heif_image* image, in
                       "Cannot allocate image memory."};
   }
   else {
-    return heif_error{heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
+    return heif_error_success;
   }
 }
 
@@ -1441,8 +1442,7 @@ struct heif_error heif_image_set_raw_color_profile(struct heif_image* image,
 
   image->image->set_color_profile_icc(color_profile);
 
-  struct heif_error err = {heif_error_Ok, heif_suberror_Unspecified, Error::kSuccess};
-  return err;
+  return heif_error_success;
 }
 
 
@@ -1458,7 +1458,7 @@ struct heif_error heif_image_set_nclx_color_profile(struct heif_image* image,
 
   image->image->set_color_profile_nclx(nclx);
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -1994,7 +1994,7 @@ struct heif_error heif_item_get_property_user_description(const struct heif_cont
 
   *out = udes_c;
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -2020,7 +2020,7 @@ struct heif_error heif_item_add_property_user_description(const struct heif_cont
     *out_propertyId = id;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -2136,7 +2136,7 @@ struct heif_error heif_register_decoder_plugin(const heif_decoder_plugin* decode
   }
 
   register_decoder(decoder_plugin);
-  return error_Ok;
+  return heif_error_success;
 }
 
 struct heif_error heif_register_encoder_plugin(const heif_encoder_plugin* encoder_plugin)
@@ -2149,7 +2149,7 @@ struct heif_error heif_register_encoder_plugin(const heif_encoder_plugin* encode
   }
 
   register_encoder(encoder_plugin);
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -2214,7 +2214,13 @@ struct heif_error heif_context_write(struct heif_context* ctx,
   ctx->context->write(swriter);
 
   const auto& data = swriter.get_data();
-  return writer->write(ctx, data.data(), data.size(), userdata);
+  heif_error writer_error = writer->write(ctx, data.data(), data.size(), userdata);
+  if (!writer_error.message) {
+    return heif_error{heif_error_Usage_error, heif_suberror_Null_pointer_argument, "heif_writer callback returned a null error text"};
+  }
+  else {
+    return writer_error;
+  }
 }
 
 
@@ -2483,8 +2489,7 @@ struct heif_error heif_encoder_set_logging_level(struct heif_encoder* encoder, i
     return encoder->plugin->set_parameter_logging_level(encoder->encoder, level);
   }
 
-  struct heif_error err = {heif_error_Ok, heif_suberror_Unspecified, kSuccess};
-  return err;
+  return heif_error_success;
 }
 
 
@@ -2584,7 +2589,7 @@ heif_encoder_parameter_get_valid_integer_range(const struct heif_encoder_paramet
     *have_minimum_maximum = param->integer.have_minimum_maximum;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 LIBHEIF_API
@@ -2632,7 +2637,7 @@ struct heif_error heif_encoder_parameter_get_valid_integer_values(const struct h
     *num_valid_values = param->integer.num_valid_values;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -2648,7 +2653,7 @@ heif_encoder_parameter_get_valid_string_values(const struct heif_encoder_paramet
     *out_stringarray = param->string.valid_values;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 struct heif_error heif_encoder_parameter_integer_valid_range(struct heif_encoder* encoder,
@@ -2771,7 +2776,7 @@ struct heif_error heif_encoder_set_parameter(struct heif_encoder* encoder,
           break;
       }
 
-      return error_Ok;
+      return heif_error_success;
     }
   }
 
@@ -2824,7 +2829,7 @@ struct heif_error heif_encoder_get_parameter(struct heif_encoder* encoder,
           break;
       }
 
-      return error_Ok;
+      return heif_error_success;
     }
   }
 
@@ -2965,7 +2970,7 @@ struct heif_error heif_context_encode_image(struct heif_context* ctx,
     (*out_image_handle)->context = ctx->context;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3027,7 +3032,7 @@ struct heif_error heif_context_encode_thumbnail(struct heif_context* ctx,
     }
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3036,7 +3041,7 @@ struct heif_error heif_context_set_primary_image(struct heif_context* ctx,
 {
   ctx->context->set_primary_image(image_handle->image);
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3049,7 +3054,7 @@ struct heif_error heif_context_add_exif_metadata(struct heif_context* ctx,
     return error.error_struct(ctx->context.get());
   }
   else {
-    return error_Ok;
+    return heif_error_success;
   }
 }
 
@@ -3073,7 +3078,7 @@ struct heif_error heif_context_add_XMP_metadata2(struct heif_context* ctx,
     return error.error_struct(ctx->context.get());
   }
   else {
-    return error_Ok;
+    return heif_error_success;
   }
 }
 
@@ -3089,7 +3094,7 @@ struct heif_error heif_context_add_generic_metadata(struct heif_context* ctx,
     return error.error_struct(ctx->context.get());
   }
   else {
-    return error_Ok;
+    return heif_error_success;
   }
 }
 
@@ -3142,7 +3147,7 @@ struct heif_error heif_context_get_region_item(const struct heif_context* contex
   item->region_item = r;
   *out = item;
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3212,7 +3217,7 @@ struct heif_error heif_image_handle_add_region_item(struct heif_image_handle* im
     *out_region_item = item;
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3241,7 +3246,7 @@ struct heif_error heif_region_item_add_region_point(struct heif_region_item* ite
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3262,7 +3267,7 @@ struct heif_error heif_region_item_add_region_rectangle(struct heif_region_item*
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3283,7 +3288,7 @@ struct heif_error heif_region_item_add_region_ellipse(struct heif_region_item* i
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3307,7 +3312,7 @@ struct heif_error heif_region_item_add_region_polygon(struct heif_region_item* i
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3331,7 +3336,7 @@ struct heif_error heif_region_item_add_region_polyline(struct heif_region_item* 
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3361,7 +3366,7 @@ struct heif_error heif_region_item_add_region_referenced_mask(struct heif_region
   std::shared_ptr<HeifContext> ctx = item->context;
   ctx->add_region_referenced_mask_ref(item->region_item->item_id, mask_item_id);
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3386,7 +3391,7 @@ struct heif_error heif_region_item_add_region_inline_mask_data(struct heif_regio
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 struct heif_error heif_region_item_add_region_inline_mask(struct heif_region_item* item,
@@ -3428,7 +3433,7 @@ struct heif_error heif_region_item_add_region_inline_mask(struct heif_region_ite
     *out_region = create_region(region, item);
   }
 
-  return error_Ok;
+  return heif_error_success;
 }
 
 
@@ -3461,7 +3466,7 @@ struct heif_error heif_region_get_point(const struct heif_region* region, int32_
   if (point) {
     *x = point->x;
     *y = point->y;
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3484,7 +3489,7 @@ struct heif_error heif_region_get_point_transformed(const struct heif_region* re
     *x = p.x;
     *y = p.y;
 
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3501,7 +3506,7 @@ struct heif_error heif_region_get_rectangle(const struct heif_region* region,
     *y = rect->y;
     *width = rect->width;
     *height = rect->height;
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3526,7 +3531,7 @@ struct heif_error heif_region_get_rectangle_transformed(const struct heif_region
     *y = p.y;
     *width = e.x;
     *height = e.y;
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3543,7 +3548,7 @@ struct heif_error heif_region_get_ellipse(const struct heif_region* region,
     *y = ellipse->y;
     *radius_x = ellipse->radius_x;
     *radius_y = ellipse->radius_y;
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3568,7 +3573,7 @@ struct heif_error heif_region_get_ellipse_transformed(const struct heif_region* 
     *y = p.y;
     *radius_x = e.x;
     *radius_y = e.y;
-    return heif_error_ok;
+    return heif_error_success;
   }
 
   return heif_error_invalid_parameter_value;
@@ -3609,7 +3614,7 @@ static struct heif_error heif_region_get_poly_points(const struct heif_region* r
       pts[2 * i + 0] = poly->points[i].x;
       pts[2 * i + 1] = poly->points[i].y;
     }
-    return heif_error_ok;
+    return heif_error_success;
   }
   return heif_error_invalid_parameter_value;
 }
@@ -3646,7 +3651,7 @@ static struct heif_error heif_region_get_poly_points_scaled(const struct heif_re
       pts[2 * i + 0] = p.x;
       pts[2 * i + 1] = p.y;
     }
-    return heif_error_ok;
+    return heif_error_success;
   }
   return heif_error_invalid_parameter_value;
 }
@@ -3680,7 +3685,7 @@ struct heif_error heif_region_get_referenced_mask_ID(const struct heif_region* r
     *width = mask->width;
     *height = mask->height;
     *mask_item_id = mask->referenced_item;
-    return heif_error_ok;
+    return heif_error_success;
   }
   return heif_error_invalid_parameter_value;
 }
@@ -3712,7 +3717,7 @@ struct heif_error heif_region_get_inline_mask_data(const struct heif_region* reg
     *width = mask->width;
     *height = mask->height;
     memcpy(data, mask->mask_data.data(), mask->mask_data.size());
-    return heif_error_ok;
+    return heif_error_success;
   }
   return heif_error_invalid_parameter_value;
 }
@@ -3763,7 +3768,7 @@ static struct heif_error heif_region_get_inline_mask_image(const struct heif_reg
         pixel_index++;
       }
     }
-    return heif_error_ok;
+    return heif_error_success;
   }
   return heif_error_invalid_parameter_value;
 }
