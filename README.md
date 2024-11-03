@@ -26,18 +26,18 @@ libheif has support for:
 * decoding of files while downloading (e.g. extract image size before file has been completely downloaded)
 
 Supported codecs:
-| Format       |  Decoders        |  Encoders           |
-|:-------------|:----------------:|:-------------------:|
-| HEIC         | libde265, ffmpeg | x265, kvazaar       |
-| AVIF         | AOM, dav1d       | AOM, rav1e, svt-av1 |
-| JPEG         | libjpeg(-turbo)  | libjpeg(-turbo)     |
-| JPEG2000     | OpenJPEG         | OpenJPEG            |
-| uncompressed | built-in         | built-in            |
+| Format       |  Decoders           |  Encoders             |
+|:-------------|:-------------------:|:---------------------:|
+| HEIC         | libde265, ffmpeg    | x265, kvazaar         |
+| AVIF         | AOM, dav1d          | AOM, rav1e, svt-av1   |
+| VVC          | vvdec (experimental)| uvg266 (experimental) |
+| JPEG         | libjpeg(-turbo)     | libjpeg(-turbo)       |
+| JPEG2000     | OpenJPEG            | OpenJPEG              |
+| uncompressed | built-in            | built-in              |
 
 ## API
 
 The library has a C API for easy integration and wide language support.
-Note that the API is still work in progress and may still change.
 
 The decoder automatically supports both HEIF and AVIF through the same API. No changes are required to existing code to support AVIF.
 The encoder can be switched between HEIF and AVIF simply by setting `heif_compression_HEVC` or `heif_compression_AV1`
@@ -155,7 +155,7 @@ For each codec, there are two configuration variables:
 * `WITH_{codec}_PLUGIN`: when enabled, the codec is compiled as a separate plugin.
 
 In order to use dynamic plugins, also make sure that `ENABLE_PLUGIN_LOADING` is enabled.
-The placeholder `{codec}` can have these values: `LIBDE265`, `X265`, `AOM_DECODER`, `AOM_ENCODER`, `SvtEnc`, `DAV1D`, `FFMPEG_DECODER`, `JPEG_DECODER`, `JPEG_ENCODER`, `KVAZAAR`, `OpenJPEG_DECODER`, `OpenJPEG_ENCODER`.
+The placeholder `{codec}` can have these values: `LIBDE265`, `X265`, `AOM_DECODER`, `AOM_ENCODER`, `SvtEnc`, `DAV1D`, `FFMPEG_DECODER`, `JPEG_DECODER`, `JPEG_ENCODER`, `KVAZAAR`, `OpenJPEG_DECODER`, `OpenJPEG_ENCODER`, `OPENJPH_ENCODER`, `UVG266`, `VVDEC`.
 
 Further options are:
 
@@ -305,7 +305,7 @@ This is `libheif` running in JavaScript in your browser.
 ## Example programs
 
 Some example programs are provided in the `examples` directory.
-The program `heif-convert` converts all images stored in an HEIF/AVIF file to JPEG or PNG.
+The program `heif-dec` converts all images stored in an HEIF/AVIF file to JPEG or PNG.
 `heif-enc` lets you convert JPEG files to HEIF/AVIF.
 The program `heif-info` is a simple, minimal decoder that dumps the file structure to the console.
 
@@ -313,7 +313,7 @@ For example convert `example.heic` to JPEGs and one of the JPEGs back to HEIF:
 
 ```sh
 cd examples/
-./heif-convert example.heic example.jpeg
+./heif-dec example.heic example.jpeg
 ./heif-enc example-1.jpeg -o example.heif
 ```
 
