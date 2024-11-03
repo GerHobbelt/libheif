@@ -33,8 +33,9 @@ set(libheif_sources
         init.h
         logging.h
         logging.cc
-        metadata_compression.cc
-        metadata_compression.h
+        compression.h
+        compression_brotli.cc
+        compression_zlib.cc
         common_utils.cc
         common_utils.h
         region.cc
@@ -133,11 +134,16 @@ else ()
     message("Not compiling 'libsharpyuv'")
 endif ()
 
-if (WITH_DEFLATE_HEADER_COMPRESSION)
-    find_package(ZLIB REQUIRED)
+if (ZLIB_FOUND)
+    target_compile_definitions(heif PRIVATE HAVE_ZLIB=1)
     target_link_libraries(heif PRIVATE ZLIB::ZLIB)
-    target_compile_definitions(heif PRIVATE WITH_DEFLATE_HEADER_COMPRESSION=1)
 endif ()
+
+if (Brotli_FOUND)
+    target_compile_definitions(heif PUBLIC HAVE_BROTLI=1)
+    target_include_directories(heif PRIVATE ${BROTLI_INCLUDE_DIRS})
+    target_link_libraries(heif PRIVATE ${BROTLI_LIBS})
+endif()
 
 if (ENABLE_MULTITHREADING_SUPPORT)
     find_package(Threads)
@@ -172,3 +178,14 @@ install(EXPORT ${PROJECT_NAME}-config DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake
 
 install(FILES ${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}-config-version.cmake DESTINATION
         "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
+
+
+# --- on Windows, copy the DLL into the executable directory for easier development
+
+if (WIN32 AND BUILD_SHARED_LIBS)
+    add_custom_command(TARGET heif POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy
+            $<TARGET_FILE:heif>
+            $<TARGET_FILE_DIR:heif>/../examples
+    )
+endif ()

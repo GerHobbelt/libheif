@@ -216,3 +216,352 @@ TEST_CASE( "uncC" )
     std::string dump_output = uncC->dump(indent);
     REQUIRE(dump_output == "Box: uncC -----\nsize: 0   (header size: 0)\nprofile: 1919378017 (rgba)\ncomponent_index: 0\ncomponent_bit_depth: 8\ncomponent_format: unsigned\ncomponent_align_size: 0\ncomponent_index: 1\ncomponent_bit_depth: 8\ncomponent_format: unsigned\ncomponent_align_size: 0\ncomponent_index: 2\ncomponent_bit_depth: 8\ncomponent_format: unsigned\ncomponent_align_size: 0\ncomponent_index: 3\ncomponent_bit_depth: 8\ncomponent_format: unsigned\ncomponent_align_size: 0\nsampling_type: no subsampling\ninterleave_type: pixel\nblock_size: 0\ncomponents_little_endian: 0\nblock_pad_lsb: 0\nblock_little_endian: 0\nblock_reversed: 0\npad_unknown: 0\npixel_size: 0\nrow_align_size: 0\ntile_align_size: 0\nnum_tile_cols: 1\nnum_tile_rows: 1\n");
 }
+
+TEST_CASE("uncC_parse") {
+  std::vector<uint8_t> byteArray{
+    0x00, 0x00, 0x00, 0x40, 'u', 'n', 'c', 'C',
+    0x00, 0x00, 0x00, 0x00, 'r', 'g', 'b', 'a',
+    0x00, 0x00, 0x00, 0x04, 0, 0, 7, 0x00,
+    0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x02,
+    0x07, 0x00, 0x00, 0x00, 0x03, 0x07, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x02
+    };
+
+  auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                      byteArray.size(), false);
+
+  BitstreamRange range(reader, byteArray.size());
+  std::shared_ptr<Box> box;
+  Error error = Box::read(range, &box);
+  REQUIRE(error == Error::Ok);
+  REQUIRE(range.error() == 0);
+
+  REQUIRE(box->get_short_type() == fourcc("uncC"));
+  REQUIRE(box->get_type_string() == "uncC");
+  std::shared_ptr<Box_uncC> uncC = std::dynamic_pointer_cast<Box_uncC>(box);
+  REQUIRE(uncC->get_number_of_tile_columns() == 2);
+  REQUIRE(uncC->get_number_of_tile_rows() == 3);
+  Indent indent;
+  std::string dumpResult = box->dump(indent);
+  REQUIRE(dumpResult == "Box: uncC -----\n"
+                        "size: 64   (header size: 12)\n"
+                        "profile: 1919378017 (rgba)\n"
+                        "component_index: 0\n"
+                        "component_bit_depth: 8\n"
+                        "component_format: unsigned\n"
+                        "component_align_size: 0\n"
+                        "component_index: 1\n"
+                        "component_bit_depth: 8\n"
+                        "component_format: unsigned\n"
+                        "component_align_size: 0\n"
+                        "component_index: 2\n"
+                        "component_bit_depth: 8\n"
+                        "component_format: unsigned\n"
+                        "component_align_size: 0\n"
+                        "component_index: 3\n"
+                        "component_bit_depth: 8\n"
+                        "component_format: unsigned\n"
+                        "component_align_size: 0\n"
+                        "sampling_type: no subsampling\n"
+                        "interleave_type: pixel\n"
+                        "block_size: 0\n"
+                        "components_little_endian: 0\n"
+                        "block_pad_lsb: 0\n"
+                        "block_little_endian: 0\n"
+                        "block_reversed: 0\n"
+                        "pad_unknown: 0\n"
+                        "pixel_size: 0\n"
+                        "row_align_size: 0\n"
+                        "tile_align_size: 0\n"
+                        "num_tile_cols: 2\n"
+                        "num_tile_rows: 3\n");
+}
+
+TEST_CASE("uncC_parse_no_overflow") {
+  std::vector<uint8_t> byteArray{
+    0x00, 0x00, 0x00, 0x40, 'u', 'n', 'c', 'C',
+    0x00, 0x00, 0x00, 0x00, 'r', 'g', 'b', 'a',
+    0x00, 0x00, 0x00, 0x04, 0, 0, 7, 0x00,
+    0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x02,
+    0x07, 0x00, 0x00, 0x00, 0x03, 0x07, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xff, 0xff, 0xff, 0xfe, 0xff, 0xff, 0xff, 0xfe
+    };
+
+  auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                      byteArray.size(), false);
+
+  BitstreamRange range(reader, byteArray.size());
+  std::shared_ptr<Box> box;
+  Error error = Box::read(range, &box);
+  REQUIRE(error == Error::Ok);
+  REQUIRE(range.error() == 0);
+
+  REQUIRE(box->get_short_type() == fourcc("uncC"));
+  REQUIRE(box->get_type_string() == "uncC");
+  std::shared_ptr<Box_uncC> uncC = std::dynamic_pointer_cast<Box_uncC>(box);
+  REQUIRE(uncC->get_number_of_tile_columns() == 4294967295);
+  REQUIRE(uncC->get_number_of_tile_rows() == 4294967295);
+}
+
+TEST_CASE("uncC_parse_excess_tile_cols") {
+  std::vector<uint8_t> byteArray{
+    0x00, 0x00, 0x00, 0x40, 'u', 'n', 'c', 'C',
+    0x00, 0x00, 0x00, 0x00, 'r', 'g', 'b', 'a',
+    0x00, 0x00, 0x00, 0x04, 0, 0, 7, 0x00,
+    0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x02,
+    0x07, 0x00, 0x00, 0x00, 0x03, 0x07, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x7f, 0xff
+    };
+
+  auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                      byteArray.size(), false);
+  BitstreamRange range(reader, byteArray.size());
+  std::shared_ptr<Box> box;
+  Error error = Box::read(range, &box);
+  REQUIRE(range.error() == 0);
+  REQUIRE(error.error_code == 6);
+  REQUIRE(error.sub_error_code == 1000);
+  REQUIRE(error.message == "Tiling size 4294967296 x 32768 exceeds the maximum allowed size 4294967295 x 4294967295");
+}
+
+TEST_CASE("uncC_parse_excess_tile_rows") {
+  std::vector<uint8_t> byteArray{
+    0x00, 0x00, 0x00, 0x40, 'u', 'n', 'c', 'C',
+    0x00, 0x00, 0x00, 0x00, 'r', 'g', 'b', 'a',
+    0x00, 0x00, 0x00, 0x04, 0, 0, 7, 0x00,
+    0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x02,
+    0x07, 0x00, 0x00, 0x00, 0x03, 0x07, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff
+    };
+
+  auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                      byteArray.size(), false);
+  BitstreamRange range(reader, byteArray.size());
+  std::shared_ptr<Box> box;
+  Error error = Box::read(range, &box);
+  REQUIRE(range.error() == 0);
+  REQUIRE(error.error_code == 6);
+  REQUIRE(error.sub_error_code == 1000);
+  REQUIRE(error.message == "Tiling size 32768 x 4294967296 exceeds the maximum allowed size 4294967295 x 4294967295");
+}
+
+TEST_CASE("cmpC_defl") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x11, 'c', 'm', 'p', 'C',
+      0x00, 0x00, 0x00, 0x00, 'd', 'e', 'f', 'l',
+      0x00
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("cmpC"));
+    REQUIRE(box->get_type_string() == "cmpC");
+    std::shared_ptr<Box_cmpC> cmpC = std::dynamic_pointer_cast<Box_cmpC>(box);
+    REQUIRE(cmpC != nullptr);
+    REQUIRE(cmpC->get_compression_type() == fourcc("defl"));
+    REQUIRE(cmpC->get_must_decompress_individual_entities() == false);
+    REQUIRE(cmpC->get_compressed_range_type() == 0);
+
+    StreamWriter writer;
+    Error err = cmpC->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = cmpC->dump(indent);
+    REQUIRE(dump_output == "Box: cmpC -----\nsize: 17   (header size: 12)\ncompression_type: defl\nmust_decompress_individual_entities: 0\ncompressed_entity_type: 0\n");
+
+}
+
+
+TEST_CASE("cmpC_zlib") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x11, 'c', 'm', 'p', 'C',
+      0x00, 0x00, 0x00, 0x00, 'z', 'l', 'i', 'b',
+      0x82
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("cmpC"));
+    REQUIRE(box->get_type_string() == "cmpC");
+    std::shared_ptr<Box_cmpC> cmpC = std::dynamic_pointer_cast<Box_cmpC>(box);
+    REQUIRE(cmpC != nullptr);
+    REQUIRE(cmpC->get_compression_type() == fourcc("zlib"));
+    REQUIRE(cmpC->get_must_decompress_individual_entities() == true);
+    REQUIRE(cmpC->get_compressed_range_type() == 2);
+
+    StreamWriter writer;
+    Error err = cmpC->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = cmpC->dump(indent);
+    REQUIRE(dump_output == "Box: cmpC -----\nsize: 17   (header size: 12)\ncompression_type: zlib\nmust_decompress_individual_entities: 1\ncompressed_entity_type: 2\n");
+
+}
+
+TEST_CASE("cmpC_brot") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x11, 'c', 'm', 'p', 'C',
+      0x00, 0x00, 0x00, 0x00, 'b', 'r', 'o', 't',
+      0x81
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("cmpC"));
+    REQUIRE(box->get_type_string() == "cmpC");
+    std::shared_ptr<Box_cmpC> cmpC = std::dynamic_pointer_cast<Box_cmpC>(box);
+    REQUIRE(cmpC != nullptr);
+    REQUIRE(cmpC->get_compression_type() == fourcc("brot"));
+    REQUIRE(cmpC->get_must_decompress_individual_entities() == true);
+    REQUIRE(cmpC->get_compressed_range_type() == 1);
+
+    StreamWriter writer;
+    Error err = cmpC->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = cmpC->dump(indent);
+    REQUIRE(dump_output == "Box: cmpC -----\nsize: 17   (header size: 12)\ncompression_type: brot\nmust_decompress_individual_entities: 1\ncompressed_entity_type: 1\n");
+
+  }
+
+TEST_CASE("icbr_empty") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x10, 'i', 'c', 'b', 'r',
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("icbr"));
+    REQUIRE(box->get_type_string() == "icbr");
+    std::shared_ptr<Box_icbr> icbr = std::dynamic_pointer_cast<Box_icbr>(box);
+    REQUIRE(icbr != nullptr);
+    REQUIRE(icbr->get_ranges().size() == 0);
+
+    StreamWriter writer;
+    Error err = icbr->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = icbr->dump(indent);
+    REQUIRE(dump_output == "Box: icbr -----\nsize: 16   (header size: 12)\nnum_ranges: 0\n");
+}
+
+TEST_CASE("icbr_version0") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x20, 'i', 'c', 'b', 'r',
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+      0x00, 0x00, 0x0a, 0x03, 0x00, 0x01, 0x02, 0x03,
+      0x00, 0x02, 0x03, 0x0a, 0x00, 0x04, 0x05, 0x07
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("icbr"));
+    REQUIRE(box->get_type_string() == "icbr");
+    std::shared_ptr<Box_icbr> icbr = std::dynamic_pointer_cast<Box_icbr>(box);
+    REQUIRE(icbr != nullptr);
+    REQUIRE(icbr->get_ranges().size() == 2);
+    REQUIRE(icbr->get_version() == 0);
+
+    StreamWriter writer;
+    Error err = icbr->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = icbr->dump(indent);
+    REQUIRE(dump_output == "Box: icbr -----\nsize: 32   (header size: 12)\nnum_ranges: 2\nrange_offset: 2563, range_size: 66051\nrange_offset: 131850, range_size: 263431\n");
+}
+
+TEST_CASE("icbr_version1") {
+    std::vector<uint8_t> byteArray{
+      0x00, 0x00, 0x00, 0x30, 'i', 'c', 'b', 'r',
+      0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0a, 0x03,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x02, 0x03,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x0a,
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x05, 0x07
+      };
+
+    auto reader = std::make_shared<StreamReader_memory>(byteArray.data(),
+                                                        byteArray.size(), false);
+
+    BitstreamRange range(reader, byteArray.size());
+    std::shared_ptr<Box> box;
+    Error error = Box::read(range, &box);
+    REQUIRE(error == Error::Ok);
+    REQUIRE(range.error() == 0);
+
+    REQUIRE(box->get_short_type() == fourcc("icbr"));
+    REQUIRE(box->get_type_string() == "icbr");
+    std::shared_ptr<Box_icbr> icbr = std::dynamic_pointer_cast<Box_icbr>(box);
+    REQUIRE(icbr != nullptr);
+    REQUIRE(icbr->get_ranges().size() == 2);
+    REQUIRE(icbr->get_version() == 1);
+
+    StreamWriter writer;
+    Error err = icbr->write(writer);
+    REQUIRE(err.error_code == heif_error_Ok);
+    const std::vector<uint8_t> written = writer.get_data();
+    REQUIRE(written == byteArray);
+
+    Indent indent;
+    std::string dump_output = icbr->dump(indent);
+    REQUIRE(dump_output == "Box: icbr -----\nsize: 48   (header size: 12)\nnum_ranges: 2\nrange_offset: 2563, range_size: 66051\nrange_offset: 131850, range_size: 263431\n");
+}

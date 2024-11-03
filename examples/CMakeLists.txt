@@ -55,6 +55,10 @@ target_link_libraries(heif-enc PRIVATE heif)
 install(TARGETS heif-enc RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 install(FILES heif-enc.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 
+if (WITH_HEADER_COMPRESSION)
+    target_compile_definitions(heif-enc PRIVATE WITH_HEADER_COMPRESSION=1)
+endif ()
+
 
 add_executable(heif-test ${getopt_sources}
         heif_test.cc
@@ -122,3 +126,30 @@ if (TARGET PNG::PNG)
     install(TARGETS heif-thumbnailer RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
     install(FILES heif-thumbnailer.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 endif ()
+
+find_package(TIFF)
+if (TIFF_FOUND)
+    target_link_libraries(heif-enc PRIVATE TIFF::TIFF)
+    target_sources(heif-enc PRIVATE decoder_tiff.cc decoder_tiff.h)
+    target_compile_definitions(heif-enc PUBLIC HAVE_LIBTIFF=1)
+endif ()
+
+message("")
+message("=== Active input formats for heif-enc ===")
+if (JPEG_FOUND)
+    message("JPEG: active")
+else ()
+    message("JPEG: ------ (libjpeg not found)")
+endif ()
+if (PNG_FOUND)
+    message("PNG:  active")
+else ()
+    message("PNG:  ------ (libpng not found)")
+endif ()
+if (TIFF_FOUND)
+    message("TIFF: active")
+else ()
+    message("TIFF: ------ (libtiff not found)")
+endif ()
+message("")
+

@@ -1,6 +1,6 @@
 /*
  * HEIF codec.
- * Copyright (c) 2022 Dirk Farin <dirk.farin@gmail.com>
+ * Copyright (c) 2023 Dirk Farin <dirk.farin@gmail.com>
  *
  * This file is part of libheif.
  *
@@ -17,17 +17,18 @@
  * You should have received a copy of the GNU Lesser General Public License
  * along with libheif.  If not, see <http://www.gnu.org/licenses/>.
  */
-#ifndef LIBHEIF_METADATA_COMPRESSION_H
-#define LIBHEIF_METADATA_COMPRESSION_H
 
-#include <vector>
-#include <cinttypes>
-#include <cstddef>
+#ifndef LIBHEIF_ENCODER_VVENC_H
+#define LIBHEIF_ENCODER_VVENC_H
 
-#if WITH_DEFLATE_HEADER_COMPRESSION
-std::vector<uint8_t> deflate(const uint8_t* input, size_t size);
+#include "common_utils.h"
 
-std::vector<uint8_t> inflate(const std::vector<uint8_t>&);
+const struct heif_encoder_plugin* get_encoder_plugin_vvenc();
+
+#if PLUGIN_VVENC
+extern "C" {
+MAYBE_UNUSED LIBHEIF_API extern heif_plugin_info plugin_info;
+}
 #endif
 
-#endif //LIBHEIF_METADATA_COMPRESSION_H
+#endif

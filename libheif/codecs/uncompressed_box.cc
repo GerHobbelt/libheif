@@ -27,6 +27,7 @@
 #include <cassert>
 
 #include "libheif/heif.h"
+#include "security_limits.h"
 #include "uncompressed.h"
 #include "uncompressed_box.h"
 
@@ -260,9 +261,19 @@ Error Box_uncC::parse(BitstreamRange& range)
 
     m_tile_align_size = range.read32();
 
-    m_num_tile_cols = range.read32() + 1;
+    uint32_t num_tile_cols_minus_one = range.read32();
+    uint32_t num_tile_rows_minus_one = range.read32();
+    if ((num_tile_cols_minus_one >= UINT32_MAX) || (num_tile_rows_minus_one >= UINT32_MAX)) {
+      std::stringstream sstr;
+      sstr << "Tiling size " << ((uint64_t)num_tile_cols_minus_one + 1) << " x " << ((uint64_t)num_tile_rows_minus_one + 1) << " exceeds the maximum allowed size "
+           << UINT32_MAX << " x " << UINT32_MAX;
+      return Error(heif_error_Memory_allocation_error,
+                   heif_suberror_Security_limit_exceeded,
+                   sstr.str());
+    }
+    m_num_tile_cols = num_tile_cols_minus_one + 1;
 
-    m_num_tile_rows = range.read32() + 1;
+    m_num_tile_rows = num_tile_rows_minus_one + 1;
   }
   return range.get_error();
 }
@@ -277,8 +288,8 @@ std::string Box_uncC::dump(Indent& indent) const
   sstr << indent << "profile: " << m_profile;
   if (m_profile != 0) {
     sstr << " (" << to_fourcc(m_profile) << ")";
-    sstr << "\n";
   }
+  sstr << "\n";
   if (get_version() == 0) {
     for (const auto& component : m_components) {
       sstr << indent << "component_index: " << component.component_index << "\n";
@@ -345,6 +356,107 @@ Error Box_uncC::write(StreamWriter& writer) const
     writer.write32(m_tile_align_size);
     writer.write32(m_num_tile_cols - 1);
     writer.write32(m_num_tile_rows - 1);
+  }
+  prepend_header(writer, box_start);
+
+  return Error::Ok;
+}
+
+
+Error Box_cmpC::parse(BitstreamRange& range)
+{
+  parse_full_box_header(range);
+
+  if (get_version() != 0) {
+    return unsupported_version_error("cmpC");
+  }
+
+  compression_type = range.read32();
+  uint8_t v = range.read8();
+  must_decompress_individual_entities = ((v & 0x80) == 0x80);
+  compressed_range_type = (v & 0x7f);
+  return range.get_error();
+}
+
+
+std::string Box_cmpC::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+  sstr << indent << "compression_type: " << to_fourcc(compression_type) << "\n";
+  sstr << indent << "must_decompress_individual_entities: " << must_decompress_individual_entities << "\n";
+  sstr << indent << "compressed_entity_type: " << (int)compressed_range_type << "\n";
+  return sstr.str();
+}
+
+Error Box_cmpC::write(StreamWriter& writer) const
+{
+  size_t box_start = reserve_box_header_space(writer);
+
+  writer.write32(compression_type);
+  uint8_t v = must_decompress_individual_entities ? 0x80 : 0x00;
+  v |= (compressed_range_type & 0x7F);
+  writer.write8(v);
+
+  prepend_header(writer, box_start);
+
+  return Error::Ok;
+}
+
+
+Error Box_icbr::parse(BitstreamRange& range)
+{
+  parse_full_box_header(range);
+
+  if ((get_version() != 0) && (get_version() != 1)) {
+    return unsupported_version_error("icbr");
+  }
+
+  uint32_t num_ranges = range.read32();
+  for (uint32_t r = 0; r < num_ranges; r++) {
+    struct ByteRange byteRange;
+    if (get_version() == 1) {
+      byteRange.range_offset = range.read64();
+      byteRange.range_size = range.read64();
+    } else if (get_version() == 0) {
+      byteRange.range_offset = range.read32();
+      byteRange.range_size = range.read32();
+    } else {
+      return Error(heif_error_Usage_error, heif_suberror_Unsupported_parameter, "Unsupported icbr version");
+    }
+    if (range.get_error() != Error::Ok) {
+      return range.get_error();
+    }
+    m_ranges.push_back(byteRange);
+  }
+  return range.get_error();
+}
+
+
+std::string Box_icbr::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+  sstr << indent << "num_ranges: " << m_ranges.size() << "\n";
+  for (ByteRange range: m_ranges) {
+    sstr << indent << "range_offset: " << range.range_offset << ", range_size: " << range.range_size << "\n";
+  }
+  return sstr.str();
+}
+
+Error Box_icbr::write(StreamWriter& writer) const
+{
+  size_t box_start = reserve_box_header_space(writer);
+
+  writer.write32((uint32_t)m_ranges.size());
+  for (ByteRange range: m_ranges) {
+    if (get_version() == 1) {
+      writer.write64(range.range_offset);
+      writer.write64(range.range_size);
+    } else if (get_version() == 0) {
+      writer.write32((uint32_t)range.range_offset);
+      writer.write32((uint32_t)range.range_size);
+    }
   }
   prepend_header(writer, box_start);
 

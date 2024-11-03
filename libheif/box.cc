@@ -414,12 +414,15 @@ Error Box::parse(BitstreamRange& range)
   }
   else {
     uint64_t content_size = get_box_size() - get_header_size();
-    if (range.prepare_read(content_size)) {
-      if (content_size > MAX_BOX_SIZE) {
-        return Error(heif_error_Invalid_input,
-                     heif_suberror_Invalid_box_size);
-      }
 
+    assert(MAX_BOX_SIZE <= SIZE_MAX);
+
+    if (content_size > MAX_BOX_SIZE) {
+      return Error(heif_error_Invalid_input,
+                   heif_suberror_Invalid_box_size);
+    }
+
+    if (range.prepare_read(static_cast<size_t>(content_size))) {
       range.get_istream()->seek_cur(get_box_size() - get_header_size());
     }
   }
@@ -543,6 +546,18 @@ Error Box::read(BitstreamRange& range, std::shared_ptr<Box>* result)
       box = std::make_shared<Box_grpl>();
       break;
 
+    case fourcc("pymd"):
+      box = std::make_shared<Box_pymd>();
+      break;
+
+    case fourcc("altr"):
+      box = std::make_shared<Box_EntityToGroup>();
+      break;
+
+    case fourcc("ster"):
+      box = std::make_shared<Box_ster>();
+      break;
+
     case fourcc("dinf"):
       box = std::make_shared<Box_dinf>();
       break;
@@ -611,6 +626,14 @@ Error Box::read(BitstreamRange& range, std::shared_ptr<Box>* result)
     case fourcc("uncC"):
       box = std::make_shared<Box_uncC>();
       break;
+
+    case fourcc("cmpC"):
+      box = std::make_shared<Box_cmpC>();
+      break;
+
+    case fourcc("icbr"):
+      box = std::make_shared<Box_icbr>();
+      break;
 #endif
 
     // --- JPEG 2000
@@ -671,49 +694,57 @@ Error Box::read(BitstreamRange& range, std::shared_ptr<Box>* result)
 
   box->set_short_header(hdr);
 
-  if (hdr.has_fixed_box_size() && hdr.get_box_size() < hdr.get_header_size()) {
-    std::stringstream sstr;
-    sstr << "Box size (" << hdr.get_box_size() << " bytes) smaller than header size ("
-         << hdr.get_header_size() << " bytes)";
-
-    // Sanity check.
-    return Error(heif_error_Invalid_input,
-                 heif_suberror_Invalid_box_size,
-                 sstr.str());
-  }
-
-
   if (range.get_nesting_level() > MAX_BOX_NESTING_LEVEL) {
     return Error(heif_error_Memory_allocation_error,
                  heif_suberror_Security_limit_exceeded,
                  "Security limit for maximum nesting of boxes has been exceeded");
   }
 
-
   if (hdr.has_fixed_box_size()) {
-    auto status = range.wait_for_available_bytes(hdr.get_box_size() - hdr.get_header_size());
+    // Sanity checks
+    if (hdr.get_box_size() < hdr.get_header_size()) {
+      std::stringstream sstr;
+      sstr << "Box size (" << hdr.get_box_size() << " bytes) smaller than header size ("
+           << hdr.get_header_size() << " bytes)";
+
+      return {heif_error_Invalid_input,
+              heif_suberror_Invalid_box_size,
+              sstr.str()};
+    }
+
+    // this is >= 0 because of above condition
+    auto nBytes = static_cast<uint64_t>(hdr.get_box_size() - hdr.get_header_size());
+    if (nBytes > SIZE_MAX) {
+      return {heif_error_Memory_allocation_error,
+              heif_suberror_Invalid_box_size,
+              "Box size too large"};
+    }
+
+    // Security check: make sure that box size does not exceed int64 size.
+
+    if (hdr.get_box_size() > (uint64_t) std::numeric_limits<int64_t>::max()) {
+      return {heif_error_Invalid_input,
+              heif_suberror_Invalid_box_size};
+    }
+
+    // --- wait for data to arrive
+
+    auto status = range.wait_for_available_bytes(static_cast<size_t>(nBytes));
     if (status != StreamReader::size_reached) {
       // TODO: return recoverable error at timeout
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_End_of_data);
+      return {heif_error_Invalid_input,
+              heif_suberror_End_of_data};
     }
   }
 
-  // Security check: make sure that box size does not exceed int64 size.
-
-  if (hdr.get_box_size() > (uint64_t) std::numeric_limits<int64_t>::max()) {
-    return Error(heif_error_Invalid_input,
-                 heif_suberror_Invalid_box_size);
-  }
-
-  int64_t box_size = static_cast<int64_t>(hdr.get_box_size());
+  auto box_size = static_cast<int64_t>(hdr.get_box_size());
   int64_t box_size_without_header = hdr.has_fixed_box_size() ? (box_size - hdr.get_header_size()) : (int64_t)range.get_remaining_bytes();
 
   // Box size may not be larger than remaining bytes in parent box.
 
   if ((int64_t)range.get_remaining_bytes() < box_size_without_header) {
-    return Error(heif_error_Invalid_input,
-                 heif_suberror_Invalid_box_size);
+    return {heif_error_Invalid_input,
+            heif_suberror_Invalid_box_size};
   }
 
 
@@ -908,13 +939,21 @@ Error Box_other::parse(BitstreamRange& range)
   if (has_fixed_box_size()) {
     size_t len;
     if (get_box_size() >= get_header_size()) {
-      len = get_box_size() - get_header_size();
+      auto len64 = get_box_size() - get_header_size();
+      if (len64 > MAX_BOX_SIZE) {
+        return {heif_error_Invalid_input,
+                heif_suberror_Security_limit_exceeded,
+                "Box size too large"};
+      }
+
+      len = static_cast<size_t>(len64);
+
       m_data.resize(len);
       range.read(m_data.data(), len);
     }
     else {
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_Invalid_box_size);
+      return {heif_error_Invalid_input,
+              heif_suberror_Invalid_box_size};
     }
   }
   else {
@@ -951,7 +990,8 @@ std::string Box_other::dump(Indent& indent) const
 
   size_t len = 0;
   if (get_box_size() >= get_header_size()) {
-    len = get_box_size() - get_header_size();
+    // We can cast because if it does not fit, it would fail during parsing.
+    len = static_cast<size_t>(get_box_size() - get_header_size());
   }
   else {
     sstr << indent << "invalid box size " << get_box_size() << " (smaller than header)\n";
@@ -1049,6 +1089,10 @@ Error Box_meta::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
+  if (get_version() != 0) {
+    return unsupported_version_error("meta");
+  }
+
   /*
   uint64_t boxSizeLimit;
   if (get_box_size() == BoxHeader::size_until_end_of_file) {
@@ -1073,9 +1117,24 @@ std::string Box_meta::dump(Indent& indent) const
 }
 
 
+Error FullBox::unsupported_version_error(const char* box) const
+{
+  std::stringstream sstr;
+  sstr << box << " box data version " << ((int) m_version) << " is not implemented yet";
+
+  return {heif_error_Unsupported_feature,
+          heif_suberror_Unsupported_data_version,
+          sstr.str()};
+}
+
+
 Error Box_hdlr::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() != 0) {
+    return unsupported_version_error("hdlr");
+  }
 
   m_pre_defined = range.read32();
   m_handler_type = range.read32();
@@ -1124,6 +1183,11 @@ Error Box_hdlr::write(StreamWriter& writer) const
 Error Box_pitm::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 1) {
+    return unsupported_version_error("pitm");
+  }
+
 
   if (get_version() == 0) {
     m_item_ID = range.read16();
@@ -1178,6 +1242,10 @@ Error Box_pitm::write(StreamWriter& writer) const
 Error Box_iloc::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 2) {
+    return unsupported_version_error("iloc");
+  }
 
   const int version = get_version();
 
@@ -1708,6 +1776,11 @@ Error Box_infe::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
+  // only versions 2,3 are required by HEIF
+  if (get_version() > 3) {
+    return unsupported_version_error("infe");
+  }
+
   if (get_version() <= 1) {
     m_item_ID = range.read16();
     m_item_protection_index = range.read16();
@@ -1855,6 +1928,11 @@ Error Box_iinf::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
+  // TODO: there are several images in circulation that have an iinf version=2. We should not enforce this with a hard error.
+  if (false && get_version() > 1) {
+    return unsupported_version_error("iinf");
+  }
+
   int nEntries_size = (get_version() > 0) ? 4 : 2;
 
   uint32_t item_count;
@@ -1965,6 +2043,10 @@ std::string Box_ipco::dump(Indent& indent) const
 Error Box_pixi::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() != 0) {
+    return unsupported_version_error("pixi");
+  }
 
   StreamReader::grow_status status;
   uint8_t num_channels = range.read8();
@@ -2273,6 +2355,10 @@ Error Box_ispe::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
+  if (get_version() != 0) {
+    return unsupported_version_error("ispe");
+  }
+
   m_image_width = range.read32();
   m_image_height = range.read32();
 
@@ -2320,6 +2406,12 @@ bool Box_ispe::operator==(const Box& other) const
 Error Box_ipma::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  // TODO: is there any specification of allowed values for the ipma version in the HEIF standards?
+
+  if (get_version() > 1) {
+    return unsupported_version_error("ipma");
+  }
 
   uint32_t entry_cnt = range.read32();
   for (uint32_t i = 0; i < entry_cnt && !range.error() && !range.eof(); i++) {
@@ -2502,6 +2594,10 @@ void Box_ipma::insert_entries_from_other_ipma_box(const Box_ipma& b)
 Error Box_auxC::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() != 0) {
+    return unsupported_version_error("auxC");
+  }
 
   m_aux_type = range.read_string();
 
@@ -2789,6 +2885,10 @@ void Box_clap::set(uint32_t clap_width, uint32_t clap_height,
 Error Box_iref::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 1) {
+    return unsupported_version_error("iref");
+  }
 
   while (!range.eof()) {
     Reference ref;
@@ -3124,34 +3224,7 @@ Error Box_grpl::parse(BitstreamRange& range)
 {
   //parse_full_box_header(range);
 
-  //return read_children(range);
-
-  while (!range.eof()) {
-    EntityGroup group;
-    Error err = group.header.parse_header(range);
-    if (err != Error::Ok) {
-      return err;
-    }
-
-    err = group.header.parse_full_box_header(range);
-    if (err != Error::Ok) {
-      return err;
-    }
-
-    group.group_id = range.read32();
-    uint32_t nEntities = range.read32();
-    for (uint32_t i = 0; i < nEntities; i++) {
-      if (range.eof()) {
-        break;
-      }
-
-      group.entity_ids.push_back(range.read32());
-    }
-
-    m_entity_groups.push_back(group);
-  }
-
-  return range.get_error();
+  return read_children(range); // should we pass the parsing context 'grpl' or are the box types unique?
 }
 
 
@@ -3159,21 +3232,129 @@ std::string Box_grpl::dump(Indent& indent) const
 {
   std::ostringstream sstr;
   sstr << Box::dump(indent);
+  sstr << dump_children(indent);
+  return sstr.str();
+}
 
-  for (const auto& group : m_entity_groups) {
-    sstr << indent << "group type: " << group.header.get_type_string() << "\n"
-         << indent << "| group id: " << group.group_id << "\n"
-         << indent << "| entity IDs: ";
 
-    for (uint32_t id : group.entity_ids) {
-      sstr << id << " ";
+Error Box_EntityToGroup::parse(BitstreamRange& range)
+{
+  Error err = parse_full_box_header(range);
+  if (err != Error::Ok) {
+    return err;
+  }
+
+  group_id = range.read32();
+  uint32_t nEntities = range.read32();
+  for (uint32_t i = 0; i < nEntities; i++) {
+    if (range.eof()) {
+      break;
     }
 
-    sstr << "\n";
+    entity_ids.push_back(range.read32());
+  }
+
+  return Error::Ok;
+}
+
+std::string Box_EntityToGroup::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+
+  sstr << indent << "group id: " << group_id << "\n"
+       << indent << "entity IDs: ";
+
+  bool first = true;
+  for (uint32_t id : entity_ids) {
+    if (first) {
+      first = false;
+    }
+    else {
+      sstr << ' ';
+    }
+
+    sstr << id;
+  }
+
+  sstr << "\n";
+
+  return sstr.str();
+}
+
+
+Error Box_ster::parse(BitstreamRange& range)
+{
+  Error err = Box_EntityToGroup::parse(range);
+  if (err) {
+    return err;
+  }
+
+  if (entity_ids.size() != 2) {
+    return {heif_error_Invalid_input,
+            heif_suberror_Invalid_box_size,
+            "'ster' entity group does not exists of exactly two images"};
+  }
+
+  return Error::Ok;
+}
+
+
+std::string Box_ster::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box::dump(indent);
+
+  sstr << indent << "group id: " << group_id << "\n"
+       << indent << "left image ID: " << entity_ids[0] << "\n"
+       << indent << "right image ID: " << entity_ids[1] << "\n";
+
+  return sstr.str();
+}
+
+
+
+Error Box_pymd::parse(BitstreamRange& range)
+{
+  Error err = Box_EntityToGroup::parse(range);
+  if (err) {
+    return err;
+  }
+
+  tile_size_x = range.read16();
+  tile_size_y = range.read16();
+
+  for (size_t i = 0; i < entity_ids.size(); i++) {
+    LayerInfo layer{};
+    layer.layer_binning = range.read16();
+    layer.tiles_in_layer_row_minus1 = range.read16();
+    layer.tiles_in_layer_column_minus1 = range.read16();
+
+    m_layer_infos.push_back(layer);
+  }
+
+  return Error::Ok;
+}
+
+std::string Box_pymd::dump(Indent& indent) const
+{
+  std::ostringstream sstr;
+  sstr << Box_EntityToGroup::dump(indent);
+
+  sstr << indent << "tile size: " << tile_size_x << "x" << tile_size_y << "\n";
+
+  int layerNr = 0;
+  for (const auto& layer : m_layer_infos) {
+    sstr << indent << "layer " << layerNr << ":\n"
+         << indent << "| binning: " << layer.layer_binning << "\n"
+         << indent << "| tiles: " << (layer.tiles_in_layer_row_minus1 + 1) << "x" << (layer.tiles_in_layer_column_minus1 + 1) << "\n";
+
+    layerNr++;
   }
 
   return sstr.str();
 }
+
 
 
 Error Box_dinf::parse(BitstreamRange& range)
@@ -3197,6 +3378,10 @@ std::string Box_dinf::dump(Indent& indent) const
 Error Box_dref::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() != 0) {
+    return unsupported_version_error("dref");
+  }
 
   uint32_t nEntities = range.read32();
 
@@ -3241,6 +3426,10 @@ Error Box_url::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
 
+  if (get_version() > 0) {
+    return unsupported_version_error("url");
+  }
+
   m_location = range.read_string();
 
   return range.get_error();
@@ -3262,6 +3451,11 @@ std::string Box_url::dump(Indent& indent) const
 Error Box_udes::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 0) {
+    return unsupported_version_error("udes");
+  }
+
   m_lang = range.read_string();
   m_name = range.read_string();
   m_description = range.read_string();
@@ -3346,6 +3540,10 @@ std::string Box_cmin::dump(Indent& indent) const
 Error Box_cmin::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 0) {
+    return unsupported_version_error("cmin");
+  }
 
   m_denominatorShift = (get_flags() & 0x1F00) >> 8;
   uint32_t denominator = (1U << m_denominatorShift);
@@ -3529,6 +3727,10 @@ std::array<double,9> Box_cmex::ExtrinsicMatrix::calculate_rotation_matrix() cons
 Error Box_cmex::parse(BitstreamRange& range)
 {
   parse_full_box_header(range);
+
+  if (get_version() > 0) {
+    return unsupported_version_error("cmex");
+  }
 
   m_matrix = ExtrinsicMatrix{};
 

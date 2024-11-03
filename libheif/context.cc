@@ -40,7 +40,7 @@
 #include "pixelimage.h"
 #include "libheif/api_structs.h"
 #include "security_limits.h"
-#include "metadata_compression.h"
+#include "compression.h"
 #include "color-conversion/colorconversion.h"
 #include "plugin_registry.h"
 #include "codecs/hevc.h"
@@ -178,7 +178,13 @@ Error ImageGrid::parse(const std::vector<uint8_t>& data)
   }
 
   uint8_t version = data[0];
-  (void) version; // version is unused
+  if (version != 0) {
+    std::stringstream sstr;
+    sstr << "Grid image version " << ((int)version) << " is not supported";
+    return {heif_error_Unsupported_feature,
+            heif_suberror_Unsupported_data_version,
+            sstr.str()};
+  }
 
   uint8_t flags = data[1];
   int field_size = ((flags & 1) ? 32 : 16);
@@ -312,7 +318,7 @@ private:
 Error ImageOverlay::parse(size_t num_images, const std::vector<uint8_t>& data)
 {
   Error eofError(heif_error_Invalid_input,
-                 heif_suberror_Invalid_grid_data,
+                 heif_suberror_Invalid_overlay_data,
                  "Overlay image data incomplete");
 
   if (data.size() < 2 + 4 * 2) {
@@ -320,16 +326,16 @@ Error ImageOverlay::parse(size_t num_images, const std::vector<uint8_t>& data)
   }
 
   m_version = data[0];
-  m_flags = data[1];
-
   if (m_version != 0) {
     std::stringstream sstr;
     sstr << "Overlay image data version " << ((int) m_version) << " is not implemented yet";
 
-    return Error(heif_error_Unsupported_feature,
-                 heif_suberror_Unsupported_data_version,
-                 sstr.str());
+    return {heif_error_Unsupported_feature,
+            heif_suberror_Unsupported_data_version,
+            sstr.str()};
   }
+
+  m_flags = data[1];
 
   int field_len = ((m_flags & 1) ? 4 : 2);
   int ptr = 2;
@@ -345,6 +351,12 @@ Error ImageOverlay::parse(size_t num_images, const std::vector<uint8_t>& data)
 
   m_width = readvec(data, ptr, field_len);
   m_height = readvec(data, ptr, field_len);
+
+  if (m_width==0 || m_height==0) {
+    return {heif_error_Invalid_input,
+            heif_suberror_Invalid_overlay_data,
+            "Overlay image with zero width or height."};
+  }
 
   m_offsets.resize(num_images);
 
@@ -399,8 +411,7 @@ void ImageOverlay::get_offset(size_t image_index, int32_t* x, int32_t* y) const
 
 HeifContext::HeifContext()
 {
-  m_maximum_image_width_limit = MAX_IMAGE_WIDTH;
-  m_maximum_image_height_limit = MAX_IMAGE_HEIGHT;
+  m_maximum_image_size_limit = MAX_IMAGE_SIZE;
 
   reset_to_empty_heif();
 }
@@ -455,6 +466,29 @@ void HeifContext::reset_to_empty_heif()
   m_all_images.clear();
   m_top_level_images.clear();
   m_primary_image.reset();
+}
+
+Error HeifContext::check_resolution(uint32_t width, uint32_t height) const {
+  // --- check whether the image size is "too large"
+  uint32_t max_width_height = static_cast<uint32_t>(std::numeric_limits<int>::max());
+  if ((width > max_width_height || height > max_width_height) ||
+      (height != 0 && width > m_maximum_image_size_limit / height)) {
+    std::stringstream sstr;
+    sstr << "Image size " << width << "x" << height << " exceeds the maximum image size "
+          << m_maximum_image_size_limit << "\n";
+
+    return Error(heif_error_Memory_allocation_error,
+                  heif_suberror_Security_limit_exceeded,
+                  sstr.str());
+  }
+
+  if (width==0 || height==0) {
+    return Error(heif_error_Memory_allocation_error,
+                 heif_suberror_Invalid_image_size,
+                 "zero width or height");
+  }
+
+  return Error::Ok;
 }
 
 std::shared_ptr<RegionItem> HeifContext::add_region_item(uint32_t reference_width, uint32_t reference_height)
@@ -593,18 +627,15 @@ Error HeifContext::interpret_heif_file()
         uint32_t width = ispe->get_width();
         uint32_t height = ispe->get_height();
 
-
-        // --- check whether the image size is "too large"
-
-        if (width > m_maximum_image_width_limit ||
-            height > m_maximum_image_height_limit) {
+        uint32_t max_width_height = static_cast<uint32_t>(std::numeric_limits<int>::max());
+        if (width >= max_width_height || height >= max_width_height) {
           std::stringstream sstr;
           sstr << "Image size " << width << "x" << height << " exceeds the maximum image size "
-               << m_maximum_image_width_limit << "x" << m_maximum_image_height_limit << "\n";
+                << m_maximum_image_size_limit << "\n";
 
           return Error(heif_error_Memory_allocation_error,
-                       heif_suberror_Security_limit_exceeded,
-                       sstr.str());
+                        heif_suberror_Security_limit_exceeded,
+                        sstr.str());
         }
 
         image->set_resolution(width, height);
@@ -750,9 +781,14 @@ Error HeifContext::interpret_heif_file()
             for (heif_item_id ref: refs) {
               auto master_iter = m_all_images.find(ref);
               if (master_iter == m_all_images.end()) {
-                return Error(heif_error_Invalid_input,
-                            heif_suberror_Nonexisting_item_referenced,
-                            "Non-existing alpha image referenced");
+
+                if (!m_heif_file->has_item_with_id(ref)) {
+                  return Error(heif_error_Invalid_input,
+                               heif_suberror_Nonexisting_item_referenced,
+                               "Non-existing alpha image referenced");
+                }
+
+                continue;
               }
 
               auto master_img = master_iter->second;
@@ -778,9 +814,14 @@ Error HeifContext::interpret_heif_file()
             for (heif_item_id ref: refs) {
               auto master_iter = m_all_images.find(ref);
               if (master_iter == m_all_images.end()) {
-                return Error(heif_error_Invalid_input,
-                            heif_suberror_Nonexisting_item_referenced,
-                            "Non-existing depth image referenced");
+
+                if (!m_heif_file->has_item_with_id(ref)) {
+                  return Error(heif_error_Invalid_input,
+                               heif_suberror_Nonexisting_item_referenced,
+                               "Non-existing depth image referenced");
+                }
+
+                continue;
               }
               if (image.get() == master_iter->second.get()) {
                 return Error(heif_error_Invalid_input,
@@ -1343,6 +1384,16 @@ Error HeifContext::decode_image_planar(heif_item_id ID,
   Error error;
 
 
+  // --- check whether image size exceeds maximum (according to 'ispe')
+
+  auto ispe = m_heif_file->get_property<Box_ispe>(ID);
+  if (ispe) {
+    error = check_resolution(ispe->get_width(), ispe->get_height());
+    if (error) {
+      return error;
+    }
+  }
+
   // --- decode image, depending on its type
 
   if (image_type == "hvc1" ||
@@ -1500,11 +1551,9 @@ Error HeifContext::decode_image_planar(heif_item_id ID,
     if (error) {
       return error;
     }
-    error = UncompressedImageCodec::decode_uncompressed_image(m_heif_file,
+    error = UncompressedImageCodec::decode_uncompressed_image(this,
                                                               ID,
                                                               img,
-                                                              m_maximum_image_width_limit,
-                                                              m_maximum_image_height_limit,
                                                               data);
     if (error) {
       return error;
@@ -1518,11 +1567,9 @@ Error HeifContext::decode_image_planar(heif_item_id ID,
       std::cout << "mski error 1" << std::endl;
       return error;
     }
-    error = MaskImageCodec::decode_mask_image(m_heif_file,
+    error = MaskImageCodec::decode_mask_image(this,
                                               ID,
                                               img,
-                                              m_maximum_image_width_limit,
-                                              m_maximum_image_height_limit,
                                               data);
     if (error) {
       return error;
@@ -1774,16 +1821,10 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
 
   // --- generate image of full output size
 
-  if (w >= m_maximum_image_width_limit || h >= m_maximum_image_height_limit) {
-    std::stringstream sstr;
-    sstr << "Image size " << w << "x" << h << " exceeds the maximum image size "
-         << m_maximum_image_width_limit << "x" << m_maximum_image_height_limit << "\n";
-
-    return Error(heif_error_Memory_allocation_error,
-                 heif_suberror_Security_limit_exceeded,
-                 sstr.str());
+  err = check_resolution(w, h);
+  if (err) {
+    return err;
   }
-
 
   img = std::make_shared<HeifPixelImage>();
   img->create(w, h,
@@ -1849,7 +1890,7 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
     img->add_plane(heif_channel_B, w, h, bpp);
   }
 
-  int y0 = 0;
+  uint32_t y0 = 0;
   int reference_idx = 0;
 
 #if ENABLE_PARALLEL_TILE_DECODING
@@ -1857,7 +1898,7 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
   struct tile_data
   {
     heif_item_id tileID;
-    int x_origin, y_origin;
+    uint32_t x_origin, y_origin;
   };
 
   std::deque<tile_data> tiles;
@@ -1867,24 +1908,48 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
   std::deque<std::future<Error> > errs;
 #endif
 
-  for (int y = 0; y < grid.get_rows(); y++) {
-    int x0 = 0;
-    int tile_height = 0;
+  uint32_t tile_width=0;
+  uint32_t tile_height=0;
 
-    for (int x = 0; x < grid.get_columns(); x++) {
+  for (uint32_t y = 0; y < grid.get_rows(); y++) {
+    uint32_t x0 = 0;
+
+    for (uint32_t x = 0; x < grid.get_columns(); x++) {
 
       heif_item_id tileID = image_references[reference_idx];
 
       auto iter = m_all_images.find(tileID);
       if (iter == m_all_images.end()) {
-        return Error(heif_error_Invalid_input,
-                     heif_suberror_Missing_grid_images,
-                     "Nonexistent grid image referenced");
+        return {heif_error_Invalid_input,
+                heif_suberror_Missing_grid_images,
+                "Nonexistent grid image referenced"};
       }
 
       const std::shared_ptr<Image> tileImg = iter->second;
-      int src_width = tileImg->get_width();
-      int src_height = tileImg->get_height();
+      uint32_t src_width = tileImg->get_width();
+      uint32_t src_height = tileImg->get_height();
+      err = check_resolution(src_width, src_height);
+      if (err) {
+        return err;
+      }
+
+      if (src_width < grid.get_width() / grid.get_columns() ||
+          src_height < grid.get_height() / grid.get_rows()) {
+        return {heif_error_Invalid_input,
+                heif_suberror_Invalid_grid_data,
+                "Grid tiles do not cover whole image"};
+      }
+
+      if (x==0 && y==0) {
+        // remember size of first tile and compare all other tiles against this
+        tile_width = src_width;
+        tile_height = src_height;
+      }
+      else if (src_width != tile_width || src_height != tile_height) {
+        return {heif_error_Invalid_input,
+                heif_suberror_Invalid_grid_data,
+                "Grid tiles have different sizes"};
+      }
 
 #if ENABLE_PARALLEL_TILE_DECODING
       if (m_max_decoding_threads > 0)
@@ -1894,14 +1959,13 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
         if (1)
 #endif
       {
-        Error err = decode_and_paste_tile_image(tileID, img, x0, y0, options);
+        err = decode_and_paste_tile_image(tileID, img, x0, y0, options);
         if (err) {
           return err;
         }
       }
 
       x0 += src_width;
-      tile_height = src_height; // TODO: check that all tiles have the same height
 
       reference_idx++;
     }
@@ -1957,7 +2021,7 @@ Error HeifContext::decode_full_grid_image(heif_item_id ID,
 
 Error HeifContext::decode_and_paste_tile_image(heif_item_id tileID,
                                                const std::shared_ptr<HeifPixelImage>& img,
-                                               int x0, int y0,
+                                               uint32_t x0, uint32_t y0,
                                                const heif_decoding_options& options) const
 {
   std::shared_ptr<HeifPixelImage> tile_img;
@@ -1967,16 +2031,14 @@ Error HeifContext::decode_and_paste_tile_image(heif_item_id tileID,
     return err;
   }
 
-  const int w = img->get_width();
-  const int h = img->get_height();
+  const uint32_t w = img->get_width();
+  const uint32_t h = img->get_height();
 
 
   // --- copy tile into output image
 
-  int src_width = tile_img->get_width();
-  int src_height = tile_img->get_height();
-  assert(src_width >= 0);
-  assert(src_height >= 0);
+  uint32_t src_width = tile_img->get_width();
+  uint32_t src_height = tile_img->get_height();
 
   heif_chroma chroma = img->get_chroma_format();
 
@@ -2124,14 +2186,9 @@ Error HeifContext::decode_overlay_image(heif_item_id ID,
   uint32_t w = overlay.get_canvas_width();
   uint32_t h = overlay.get_canvas_height();
 
-  if (w >= m_maximum_image_width_limit || h >= m_maximum_image_height_limit) {
-    std::stringstream sstr;
-    sstr << "Image size " << w << "x" << h << " exceeds the maximum image size "
-         << m_maximum_image_width_limit << "x" << m_maximum_image_height_limit << "\n";
-
-    return Error(heif_error_Memory_allocation_error,
-                 heif_suberror_Security_limit_exceeded,
-                 sstr.str());
+  err = check_resolution(w, h);
+  if (err) {
+    return err;
   }
 
   // TODO: seems we always have to compose this in RGB since the background color is an RGB value
@@ -3753,9 +3810,18 @@ Error HeifContext::add_generic_metadata(const std::shared_ptr<Image>& master_ima
 
 
   std::vector<uint8_t> data_array;
-  if (compression == heif_metadata_compression_deflate) {
-#if WITH_DEFLATE_HEADER_COMPRESSION
-    data_array = deflate((const uint8_t*) data, size);
+  if (compression == heif_metadata_compression_zlib) {
+#if HAVE_ZLIB
+    data_array = compress_zlib((const uint8_t*) data, size);
+    metadata_infe_box->set_content_encoding("compress_zlib");
+#else
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_header_compression_method);
+#endif
+  }
+  else if (compression == heif_metadata_compression_deflate) {
+#if HAVE_ZLIB
+    data_array = compress_zlib((const uint8_t*) data, size);
     metadata_infe_box->set_content_encoding("deflate");
 #else
     return Error(heif_error_Unsupported_feature,

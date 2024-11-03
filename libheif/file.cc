@@ -22,10 +22,11 @@
 #include "box.h"
 #include "libheif/heif.h"
 #include "libheif/heif_properties.h"
-#include "metadata_compression.h"
+#include "compression.h"
 #include "codecs/jpeg2000.h"
 #include "codecs/jpeg.h"
 #include "codecs/vvc.h"
+#include "codecs/uncompressed_box.h"
 
 #include <cstdint>
 #include <fstream>
@@ -780,193 +781,86 @@ Error HeifFile::get_compressed_image_data(heif_item_id ID, std::vector<uint8_t>*
                  sstr.str());
   }
 
-  Error error = Error(heif_error_Unsupported_feature,
-                      heif_suberror_Unsupported_codec);
   if (item_type == "hvc1") {
     // --- --- --- HEVC
-
-    // --- get properties for this image
-
-    std::vector<std::shared_ptr<Box>> properties;
-    Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
-    if (err) {
-      return err;
-    }
-
-    // --- get codec configuration
-
-    std::shared_ptr<Box_hvcC> hvcC_box;
-    for (auto& prop : properties) {
-      if (prop->get_short_type() == fourcc("hvcC")) {
-        hvcC_box = std::dynamic_pointer_cast<Box_hvcC>(prop);
-        if (hvcC_box) {
-          break;
-        }
-      }
-    }
-
-    if (!hvcC_box) {
-      // Should always have an hvcC box, because we are checking this in
-      // heif_context::interpret_heif_file()
-      assert(false);
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_hvcC_box);
-    }
-    else if (!hvcC_box->get_headers(data)) {
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_item_data);
-    }
-
-    error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+    return get_compressed_image_data_hvc1(ID, data, item);
   }
   else if (item_type == "vvc1") {
     // --- --- --- VVC
-
-    // --- get properties for this image
-
-    std::vector<std::shared_ptr<Box>> properties;
-    Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
-    if (err) {
-      return err;
-    }
-
-    // --- get codec configuration
-
-    std::shared_ptr<Box_vvcC> vvcC_box;
-    for (auto& prop : properties) {
-      if (prop->get_short_type() == fourcc("vvcC")) {
-        vvcC_box = std::dynamic_pointer_cast<Box_vvcC>(prop);
-        if (vvcC_box) {
-          break;
-        }
-      }
-    }
-
-    if (!vvcC_box) {
-      // Should always have an vvcC box, because we are checking this in
-      // heif_context::interpret_heif_file()
-      assert(false);
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_vvcC_box);
-    }
-    else if (!vvcC_box->get_headers(data)) {
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_item_data);
-    }
-
-    error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+    return get_compressed_image_data_vvc(ID, data, item);
   }
   else if (item_type == "av01") {
-    // --- --- --- AV1
-
-    // --- get properties for this image
-
-    std::vector<std::shared_ptr<Box>> properties;
-    Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
-    if (err) {
-      return err;
-    }
-
-    // --- get codec configuration
-
-    std::shared_ptr<Box_av1C> av1C_box;
-    for (auto& prop : properties) {
-      if (prop->get_short_type() == fourcc("av1C")) {
-        av1C_box = std::dynamic_pointer_cast<Box_av1C>(prop);
-        if (av1C_box) {
-          break;
-        }
-      }
-    }
-
-    if (!av1C_box) {
-      // Should always have an hvcC box, because we are checking this in
-      // heif_context::interpret_heif_file()
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_av1C_box);
-    }
-    else if (!av1C_box->get_headers(data)) {
-      return Error(heif_error_Invalid_input,
-                   heif_suberror_No_item_data);
-    }
-
-    error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+    return get_compressed_image_data_av1(ID, data, item);
   }
   else if (item_type == "jpeg" ||
            (item_type == "mime" && get_content_type(ID) == "image/jpeg")) {
-
-    // --- check if 'jpgC' is present
-
-    std::vector<std::shared_ptr<Box>> properties;
-    Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
-    if (err) {
-      return err;
-    }
-
-    // --- get codec configuration
-
-    std::shared_ptr<Box_jpgC> jpgC_box;
-    for (auto& prop : properties) {
-      if (prop->get_short_type() == fourcc("jpgC")) {
-        jpgC_box = std::dynamic_pointer_cast<Box_jpgC>(prop);
-        if (jpgC_box) {
-          *data = jpgC_box->get_data();
-          break;
-        }
-      }
-    }
-
-    error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+    return get_compressed_image_data_jpeg(ID, data, item);
   }
   else if (item_type == "j2k1") {
-    std::vector<std::shared_ptr<Box>> properties;
-    Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
-    if (err) {
-      return err;
-    }
-
-    // --- get codec configuration
-
-    std::shared_ptr<Box_j2kH> j2kH_box;
-    for (auto& prop : properties) {
-      if (prop->get_short_type() == fourcc("j2kH")) {
-        j2kH_box = std::dynamic_pointer_cast<Box_j2kH>(prop);
-        if (j2kH_box) {
-          break;
-        }
-      }
-    }
-
-    if (!j2kH_box) {
-      // Should always have an j2kH box, because we are checking this in
-      // heif_context::interpret_heif_file()
-
-      //TODO - Correctly Find the j2kH box
-      // return Error(heif_error_Invalid_input,
-      //              heif_suberror_Unspecified);
-    }
-    // else if (!j2kH_box->get_headers(data)) {
-    //   return Error(heif_error_Invalid_input,
-    //                heif_suberror_No_item_data);
-    // }
-
-    error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+      return get_compressed_image_data_jpeg2000(ID, item, data);
   }
+#if WITH_UNCOMPRESSED_CODEC
+  else if (item_type == "unci") {
+    return get_compressed_image_data_uncompressed(ID, data, item);
+  }
+#endif
   else if (true ||  // fallback case for all kinds of generic metadata (e.g. 'iptc')
            item_type == "grid" ||
            item_type == "iovl" ||
            item_type == "Exif" ||
            (item_type == "mime" && content_type == "application/rdf+xml")) {
-
+    Error error;
     bool read_uncompressed = true;
     if (item_type == "mime") {
       std::string encoding = infe_box->get_content_encoding();
-      if (encoding == "deflate") {
-#if WITH_DEFLATE_HEADER_COMPRESSION
+      if (encoding == "compress_zlib") {
+#if HAVE_ZLIB
         read_uncompressed = false;
         std::vector<uint8_t> compressed_data;
         error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, &compressed_data);
-        *data = inflate(compressed_data);
+        if (error) {
+          return error;
+        }
+        error = decompress_zlib(compressed_data, data);
+        if (error) {
+          return error;
+        }
+#else
+        return Error(heif_error_Unsupported_feature,
+                     heif_suberror_Unsupported_header_compression_method,
+                     encoding);
+#endif
+      }
+      else if (encoding == "deflate") {
+#if HAVE_ZLIB
+        read_uncompressed = false;
+        std::vector<uint8_t> compressed_data;
+        error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, &compressed_data);
+        if (error) {
+          return error;
+        }
+        error = decompress_deflate(compressed_data, data);
+        if (error) {
+          return error;
+        }
+#else
+        return Error(heif_error_Unsupported_feature,
+                     heif_suberror_Unsupported_header_compression_method,
+                     encoding);
+#endif
+      }
+      else if (encoding == "br") {
+#if HAVE_BROTLI
+        read_uncompressed = false;
+        std::vector<uint8_t> compressed_data;
+        error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, &compressed_data);
+        if (error) {
+          return error;
+        }
+        error = decompress_brotli(compressed_data, data);
+        if (error) {
+          return error;
+        }
 #else
         return Error(heif_error_Unsupported_feature,
                      heif_suberror_Unsupported_header_compression_method,
@@ -976,15 +870,319 @@ Error HeifFile::get_compressed_image_data(heif_item_id ID, std::vector<uint8_t>*
     }
 
     if (read_uncompressed) {
-      error = m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+      return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+    }
+  }
+  return Error(heif_error_Unsupported_feature, heif_suberror_Unsupported_codec);
+}
+
+#if WITH_UNCOMPRESSED_CODEC
+// generic compression and uncompressed, per 23001-17
+const Error HeifFile::get_compressed_image_data_uncompressed(heif_item_id ID, std::vector<uint8_t> *data, const Box_iloc::Item *item) const
+{
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err) {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_cmpC> cmpC_box;
+  std::shared_ptr<Box_icbr> icbr_box;
+  for (auto& prop : properties) {
+    if (prop->get_short_type() == fourcc("cmpC")) {
+      cmpC_box = std::dynamic_pointer_cast<Box_cmpC>(prop);
+    }
+    if (prop->get_short_type() == fourcc("icbr")) {
+      icbr_box = std::dynamic_pointer_cast<Box_icbr>(prop);
+    }
+    if (cmpC_box && icbr_box) {
+      break;
+    }
+  }
+  if (!cmpC_box) {
+    // assume no generic compression
+    return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+  }
+  if (!cmpC_box->get_must_decompress_individual_entities()) {
+    std::vector<uint8_t> compressed_data;
+    m_iloc_box->read_data(*item, m_input_stream, m_idat_box, &compressed_data);
+    return do_decompress_data(cmpC_box, compressed_data, data);
+  } else {
+    if (!icbr_box) {
+      std::stringstream sstr;
+      sstr << "cannot decode unci item requiring entity decompression without icbr box" << std::endl;
+      return Error(heif_error_Invalid_input,
+                  heif_suberror_No_icbr_box,
+                  sstr.str());
+    }
+    if (item->construction_method == 0) {
+      for (Box_icbr::ByteRange range: icbr_box->get_ranges()) {
+        // TODO: check errors
+        bool success = m_input_stream->seek(range.range_offset);
+        if (!success) {
+          return Error{heif_error_Invalid_input, heif_suberror_End_of_data, "error while seeking to generically compressed data"};
+        }
+        std::vector<uint8_t> compressed_range_bytes(range.range_size);
+        success = m_input_stream->read((char*) compressed_range_bytes.data(), static_cast<size_t>(compressed_range_bytes.size()));
+        if (!success) {
+          return Error{heif_error_Invalid_input, heif_suberror_End_of_data, "error while reading generically compressed data"};
+        }
+        std::vector<uint8_t> uncompressed_range_data;
+        Error err = do_decompress_data(cmpC_box, compressed_range_bytes, &uncompressed_range_data);
+        if (err) {
+          return err;
+        }
+        data->insert(data->end(), uncompressed_range_data.data(), uncompressed_range_data.data() + uncompressed_range_data.size());
+      }
+      return Error::Ok;
+    } else {
+      // TODO: implement...
+      std::stringstream sstr;
+      sstr << "cannot decode unci item from idat yet" << std::endl;
+      return Error(heif_error_Unsupported_feature,
+                  heif_suberror_Unsupported_data_version,
+                  sstr.str());
+    }
+  }
+  return Error(heif_error_Unsupported_feature, heif_suberror_Unsupported_codec);
+}
+
+const Error HeifFile::do_decompress_data(std::shared_ptr<Box_cmpC> &cmpC_box, std::vector<uint8_t> compressed_data, std::vector<uint8_t> *data) const
+{
+  if (cmpC_box->get_compression_type() == fourcc("brot")) {
+#if HAVE_BROTLI
+    return decompress_brotli(compressed_data, data);
+#else
+    std::stringstream sstr;
+    sstr << "cannot decode unci item with brotli compression - not enabled" << std::endl;
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_generic_compression_method,
+                 sstr.str());
+#endif
+  } else if (cmpC_box->get_compression_type() == fourcc("zlib")) {
+#if HAVE_ZLIB
+    return decompress_zlib(compressed_data, data);
+#else
+    std::stringstream sstr;
+    sstr << "cannot decode unci item with zlib compression - not enabled" << std::endl;
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_generic_compression_method,
+                 sstr.str());
+#endif
+  } else if (cmpC_box->get_compression_type() == fourcc("defl")) {
+#if HAVE_ZLIB
+    return decompress_deflate(compressed_data, data);
+#else
+    std::stringstream sstr;
+    sstr << "cannot decode unci item with deflate compression - not enabled" << std::endl;
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_generic_compression_method,
+                 sstr.str());
+#endif
+  } else {
+    std::stringstream sstr;
+    sstr << "cannot decode unci item with unsupported compression type: " << cmpC_box->get_compression_type() << std::endl;
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_generic_compression_method,
+                 sstr.str());
+  }
+}
+#endif
+
+const Error HeifFile::get_compressed_image_data_hvc1(heif_item_id ID, std::vector<uint8_t> *data, const Box_iloc::Item *item) const
+{
+  // --- get properties for this image
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err)
+  {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_hvcC> hvcC_box;
+  for (auto &prop : properties)
+  {
+    if (prop->get_short_type() == fourcc("hvcC"))
+    {
+      hvcC_box = std::dynamic_pointer_cast<Box_hvcC>(prop);
+      if (hvcC_box)
+      {
+        break;
+      }
     }
   }
 
-  if (error != Error::Ok) {
-    return error;
+  if (!hvcC_box)
+  {
+    // Should always have an hvcC box, because we are checking this in
+    // heif_context::interpret_heif_file()
+    assert(false);
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_hvcC_box);
+  }
+  else if (!hvcC_box->get_headers(data))
+  {
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_item_data);
   }
 
-  return Error::Ok;
+  return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+}
+
+
+const Error HeifFile::get_compressed_image_data_vvc(heif_item_id ID, std::vector<uint8_t> *data, const Box_iloc::Item *item) const
+{
+
+  // --- get properties for this image
+
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err)
+  {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_vvcC> vvcC_box;
+  for (auto &prop : properties)
+  {
+    if (prop->get_short_type() == fourcc("vvcC"))
+    {
+      vvcC_box = std::dynamic_pointer_cast<Box_vvcC>(prop);
+      if (vvcC_box)
+      {
+        break;
+      }
+    }
+  }
+
+  if (!vvcC_box)
+  {
+    assert(false);
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_vvcC_box);
+  }
+  else if (!vvcC_box->get_headers(data))
+  {
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_item_data);
+  }
+
+  return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+}
+
+const Error HeifFile::get_compressed_image_data_av1(heif_item_id ID, std::vector<uint8_t> *data, const Box_iloc::Item *item) const
+{
+  // --- --- --- AV1
+
+  // --- get properties for this image
+
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err)
+  {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_av1C> av1C_box;
+  for (auto &prop : properties)
+  {
+    if (prop->get_short_type() == fourcc("av1C"))
+    {
+      av1C_box = std::dynamic_pointer_cast<Box_av1C>(prop);
+      if (av1C_box)
+      {
+        break;
+      }
+    }
+  }
+
+  if (!av1C_box)
+  {
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_av1C_box);
+  }
+  else if (!av1C_box->get_headers(data))
+  {
+    return Error(heif_error_Invalid_input,
+                 heif_suberror_No_item_data);
+  }
+
+  return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+}
+
+const Error HeifFile::get_compressed_image_data_jpeg2000(heif_item_id ID, const Box_iloc::Item *item, std::vector<uint8_t> *data) const
+{
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err)
+  {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_j2kH> j2kH_box;
+  for (auto &prop : properties)
+  {
+    if (prop->get_short_type() == fourcc("j2kH"))
+    {
+      j2kH_box = std::dynamic_pointer_cast<Box_j2kH>(prop);
+      if (j2kH_box)
+      {
+        break;
+      }
+    }
+  }
+
+  if (!j2kH_box)
+  {
+    // TODO - Correctly Find the j2kH box
+    //  return Error(heif_error_Invalid_input,
+    //               heif_suberror_Unspecified);
+  }
+  // else if (!j2kH_box->get_headers(data)) {
+  //   return Error(heif_error_Invalid_input,
+  //                heif_suberror_No_item_data);
+  // }
+
+  return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
+}
+
+const Error HeifFile::get_compressed_image_data_jpeg(heif_item_id ID, std::vector<uint8_t> * data, const Box_iloc::Item *item) const
+{
+  // --- check if 'jpgC' is present
+  std::vector<std::shared_ptr<Box>> properties;
+  Error err = m_ipco_box->get_properties_for_item_ID(ID, m_ipma_box, properties);
+  if (err)
+  {
+    return err;
+  }
+
+  // --- get codec configuration
+
+  std::shared_ptr<Box_jpgC> jpgC_box;
+  for (auto &prop : properties)
+  {
+    if (prop->get_short_type() == fourcc("jpgC"))
+    {
+      jpgC_box = std::dynamic_pointer_cast<Box_jpgC>(prop);
+      if (jpgC_box)
+      {
+        *data = jpgC_box->get_data();
+        break;
+      }
+    }
+  }
+
+  return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, data);
 }
 
 
@@ -1046,8 +1244,14 @@ Error HeifFile::get_item_data(heif_item_id ID, std::vector<uint8_t>* out_data, h
 
     return m_iloc_box->read_data(*item, m_input_stream, m_idat_box, out_data);
   }
+  else if (encoding == "compress_zlib") {
+    compression = heif_metadata_compression_zlib;
+  }
   else if (encoding == "deflate") {
     compression = heif_metadata_compression_deflate;
+  }
+  else if (encoding == "br") {
+    compression = heif_metadata_compression_brotli;
   }
   else {
     compression = heif_metadata_compression_unknown;
@@ -1073,10 +1277,15 @@ Error HeifFile::get_item_data(heif_item_id ID, std::vector<uint8_t>* out_data, h
   // decompress the data
 
   switch (compression) {
-#if WITH_DEFLATE_HEADER_COMPRESSION
+#if HAVE_ZLIB
+    case heif_metadata_compression_zlib:
+      return decompress_zlib(compressed_data, out_data);
     case heif_metadata_compression_deflate:
-      *out_data = inflate(compressed_data);
-      return Error::Ok;
+      return decompress_deflate(compressed_data, out_data);
+#endif
+#if HAVE_BROTLI
+    case heif_metadata_compression_brotli:
+      return decompress_brotli(compressed_data, out_data);
 #endif
     default:
       return {heif_error_Unsupported_filetype, heif_suberror_Unsupported_header_compression_method};
@@ -1489,15 +1698,25 @@ Error HeifFile::set_item_data(const std::shared_ptr<Box_infe>& item, const uint8
 
 
   std::vector<uint8_t> data_array;
-  if (compression == heif_metadata_compression_deflate) {
-#if WITH_DEFLATE_HEADER_COMPRESSION
-    data_array = deflate((const uint8_t*) data, size);
-    item->set_content_encoding("deflate");
+  if (compression == heif_metadata_compression_zlib) {
+#if HAVE_ZLIB
+    data_array = compress_zlib((const uint8_t*) data, size);
+    item->set_content_encoding("compress_zlib");
 #else
     return Error(heif_error_Unsupported_feature,
                  heif_suberror_Unsupported_header_compression_method);
 #endif
   }
+  else if (compression == heif_metadata_compression_deflate) {
+#if HAVE_ZLIB
+    data_array = compress_deflate((const uint8_t*) data, size);
+    item->set_content_encoding("compress_zlib");
+#else
+    return Error(heif_error_Unsupported_feature,
+                 heif_suberror_Unsupported_header_compression_method);
+#endif
+  }
+  // TODO: brotli
   else {
     // uncompressed data, plain copy
 

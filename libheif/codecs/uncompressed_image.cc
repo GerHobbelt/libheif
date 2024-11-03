@@ -28,6 +28,8 @@
 #include <utility>
 
 #include "common_utils.h"
+#include "context.h"
+#include "compression.h"
 #include "error.h"
 #include "libheif/heif.h"
 #include "uncompressed.h"
@@ -324,8 +326,15 @@ int UncompressedImageCodec::get_luma_bits_per_pixel_from_configuration_unci(cons
   std::shared_ptr<Box_uncC> uncC_box = std::dynamic_pointer_cast<Box_uncC>(box1);
   auto box2 = ipco->get_property_for_item_ID(imageID, ipma, fourcc("cmpd"));
   std::shared_ptr<Box_cmpd> cmpd_box = std::dynamic_pointer_cast<Box_cmpd>(box2);
-  if (!uncC_box || !cmpd_box) {
+  if (!uncC_box) {
     return -1;
+  }
+  if (!cmpd_box) {
+    if (isKnownUncompressedFrameConfigurationBoxProfile(uncC_box)) {
+      return 8;
+    } else {
+      return -1;
+    }
   }
 
   int luma_bits = 0;
@@ -552,7 +561,7 @@ protected:
 
   std::vector<ChannelListEntry> channelList;
 
-  void buildChannelList(std::shared_ptr<HeifPixelImage>& img) {     
+  void buildChannelList(std::shared_ptr<HeifPixelImage>& img) {
     for (Box_uncC::Component component : m_uncC->get_components()) {
       ChannelListEntry entry = buildChannelListEntry(component, img);
       channelList.push_back(entry);
@@ -850,14 +859,12 @@ static AbstractDecoder* makeDecoder(uint32_t width, uint32_t height, const std::
   }
 }
 
-Error UncompressedImageCodec::decode_uncompressed_image(const std::shared_ptr<const HeifFile>& heif_file,
+Error UncompressedImageCodec::decode_uncompressed_image(const HeifContext* context,
                                                         heif_item_id ID,
                                                         std::shared_ptr<HeifPixelImage>& img,
-                                                        uint32_t maximum_image_width_limit,
-                                                        uint32_t maximum_image_height_limit,
-                                                        const std::vector<uint8_t>& uncompressed_data)
+                                                        const std::vector<uint8_t>& source_data)
 {
-  if (uncompressed_data.empty()) {
+  if (source_data.empty()) {
     return {heif_error_Invalid_input,
             heif_suberror_Unspecified,
             "Uncompressed image data is empty"};
@@ -866,7 +873,7 @@ Error UncompressedImageCodec::decode_uncompressed_image(const std::shared_ptr<co
   // Get the properties for this item
   // We need: ispe, cmpd, uncC
   std::vector<std::shared_ptr<Box>> item_properties;
-  Error error = heif_file->get_properties(ID, item_properties);
+  Error error = context->get_heif_file()->get_properties(ID, item_properties);
   if (error) {
     printf("failed to get properties\n");
     return error;
@@ -877,21 +884,19 @@ Error UncompressedImageCodec::decode_uncompressed_image(const std::shared_ptr<co
   bool found_ispe = false;
   std::shared_ptr<Box_cmpd> cmpd;
   std::shared_ptr<Box_uncC> uncC;
+  std::shared_ptr<Box_cmpC> cmpC;
+  std::shared_ptr<Box_icbr> icbr;
+
   for (const auto& prop : item_properties) {
     auto ispe = std::dynamic_pointer_cast<Box_ispe>(prop);
     if (ispe) {
       width = ispe->get_width();
       height = ispe->get_height();
-
-      if (width >= maximum_image_width_limit || height >= maximum_image_height_limit) {
-        std::stringstream sstr;
-        sstr << "Image size " << width << "x" << height << " exceeds the maximum image size "
-             << maximum_image_width_limit << "x" << maximum_image_height_limit << "\n";
-        printf("way too big\n");
-        return Error(heif_error_Memory_allocation_error,
-                     heif_suberror_Security_limit_exceeded,
-                     sstr.str());
+      error = context->check_resolution(width, height);
+      if (error) {
+        return error;
       }
+
       found_ispe = true;
     }
 
@@ -904,6 +909,17 @@ Error UncompressedImageCodec::decode_uncompressed_image(const std::shared_ptr<co
     if (maybe_uncC) {
       uncC = maybe_uncC;
     }
+
+    auto maybe_cmpC = std::dynamic_pointer_cast<Box_cmpC>(prop);
+    if (maybe_cmpC) {
+      cmpC = maybe_cmpC;
+    }
+
+    auto maybe_icbr = std::dynamic_pointer_cast<Box_icbr>(prop);
+    if (maybe_icbr) {
+      icbr = maybe_icbr;
+    }
+
   }
 
 
@@ -957,7 +973,7 @@ Error UncompressedImageCodec::decode_uncompressed_image(const std::shared_ptr<co
 
   AbstractDecoder *decoder = makeDecoder(width, height, cmpd, uncC);
   if (decoder != nullptr) {
-    Error result = decoder->decode(uncompressed_data, img);
+    Error result = decoder->decode(source_data, img);
     delete decoder;
     return result;
   } else {
@@ -986,13 +1002,13 @@ Error fill_cmpd_and_uncC(std::shared_ptr<Box_cmpd>& cmpd, std::shared_ptr<Box_un
     cmpd->add_component(cbComponent);
     Box_cmpd::Component crComponent = {component_type_Cr};
     cmpd->add_component(crComponent);
-    u_int8_t bpp_y = image->get_bits_per_pixel(heif_channel_Y);
+    uint8_t bpp_y = image->get_bits_per_pixel(heif_channel_Y);
     Box_uncC::Component component0 = {0, bpp_y, component_format_unsigned, 0};
     uncC->add_component(component0);
-    u_int8_t bpp_cb = image->get_bits_per_pixel(heif_channel_Cb);
+    uint8_t bpp_cb = image->get_bits_per_pixel(heif_channel_Cb);
     Box_uncC::Component component1 = {1, bpp_cb, component_format_unsigned, 0};
     uncC->add_component(component1);
-    u_int8_t bpp_cr = image->get_bits_per_pixel(heif_channel_Cr);
+    uint8_t bpp_cr = image->get_bits_per_pixel(heif_channel_Cr);
     Box_uncC::Component component2 = {2, bpp_cr, component_format_unsigned, 0};
     uncC->add_component(component2);
     if (image->get_chroma_format() == heif_chroma_444)

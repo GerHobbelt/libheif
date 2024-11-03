@@ -72,7 +72,7 @@ StreamReader_memory::StreamReader_memory(const uint8_t* data, size_t size, bool 
 {
   if (copy) {
     m_owned_data = new uint8_t[m_length];
-    memcpy(m_owned_data, data, m_length);
+    memcpy(m_owned_data, data, size);
 
     m_data = m_owned_data;
   }
@@ -235,6 +235,31 @@ uint32_t BitstreamRange::read32()
                      (buf[3]));
 }
 
+uint64_t BitstreamRange::read64()
+{
+  if (!prepare_read(8)) {
+    return 0;
+  }
+
+  uint8_t buf[8];
+
+  auto istr = get_istream();
+  bool success = istr->read((char*) buf, 8);
+
+  if (!success) {
+    set_eof_while_reading();
+    return 0;
+  }
+
+  return (uint64_t) (((uint64_t)buf[0] << 56) |
+                     ((uint64_t)buf[1] << 48) |
+                     ((uint64_t)buf[2] << 40) |
+                     ((uint64_t)buf[3] << 32) |
+                     ((uint64_t)buf[4] << 24) |
+                     ((uint64_t)buf[5] << 16) |
+                     ((uint64_t)buf[6] << 8) |
+                     ((uint64_t)buf[7]));
+}
 
 int32_t BitstreamRange::read32s()
 {

@@ -23,9 +23,15 @@
 #include "decoder_vvdec.h"
 #include <cstring>
 #include <cassert>
+#include <vector>
+#include <algorithm>
 
 #include <vvdec/vvdec.h>
-#include <vector>
+
+#if 0
+#include <iostream>
+#include <logging.h>
+#endif
 
 
 struct vvdec_decoder
@@ -39,7 +45,6 @@ struct vvdec_decoder
 };
 
 static const char kSuccess[] = "Success";
-static const char kEmptyString[] = "";
 
 static const int VVDEC_PLUGIN_PRIORITY = 100;
 
@@ -305,6 +310,12 @@ struct heif_error vvdec_decode_image(void* decoder_raw, struct heif_image** out_
     for (int y = 0; y < h; y++) {
       memcpy(dst_mem + y * dst_stride, data + y * stride, w * bytes_per_pixel);
     }
+
+#if 0
+      std::cout << "DATA " << c << " " << w << " " << h << " bpp:" << bpp << "\n";
+      std::cout << write_raw_data_as_hex(dst_mem, w*h, {}, {});
+      std::cout << "---\n";
+#endif
   }
 
   *out_img = heif_img;
