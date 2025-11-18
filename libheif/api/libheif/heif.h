@@ -21,7 +21,9 @@
 #ifndef LIBHEIF_HEIF_H
 #define LIBHEIF_HEIF_H
 
+#if !defined(_WIN32)
 #include <sys/time.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
