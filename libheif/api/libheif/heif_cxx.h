@@ -566,7 +566,8 @@ namespace heif {
 
   inline bool Context::is_top_level_image_ID(heif_item_id id) const noexcept
   {
-    return heif_context_is_top_level_image_ID(m_context.get(), id);
+	// fix warning C4800: Implicit conversion from 'int' to bool.
+    return !!heif_context_is_top_level_image_ID(m_context.get(), id);
   }
 
   inline std::vector<heif_item_id> Context::get_list_of_top_level_image_IDs() const noexcept
@@ -815,7 +816,7 @@ namespace heif {
   { return mProfile->matrix_coefficients; }
 
   inline bool ColorProfile_nclx::is_full_range() const
-  { return mProfile->full_range_flag; }
+  { return !!mProfile->full_range_flag; }
 
   inline void ColorProfile_nclx::set_color_primaries(heif_color_primaries cp)
   { mProfile->color_primaries = cp; }
@@ -897,7 +898,8 @@ namespace heif {
 
   inline bool Image::has_channel(enum heif_channel channel) const noexcept
   {
-    return heif_image_has_channel(m_image.get(), channel);
+	  // fix warning C4800: Implicit conversion from 'int' to bool.
+	  return !!heif_image_has_channel(m_image.get(), channel);
   }
 
   inline const uint8_t* Image::get_plane(enum heif_channel channel, int* out_stride) const noexcept
@@ -1045,22 +1047,24 @@ namespace heif {
 
   inline bool EncoderDescriptor::supportes_lossy_compression() const noexcept
   {
-    return heif_encoder_descriptor_supports_lossy_compression(m_descriptor);
+	  // fix warning C4800: Implicit conversion from 'int' to bool.
+	  return !!heif_encoder_descriptor_supports_lossy_compression(m_descriptor);
   }
 
   inline bool EncoderDescriptor::supports_lossy_compression() const noexcept
   {
-    return heif_encoder_descriptor_supports_lossy_compression(m_descriptor);
+	  // fix warning C4800: Implicit conversion from 'int' to bool.
+	  return !!heif_encoder_descriptor_supports_lossy_compression(m_descriptor);
   }
 
   inline bool EncoderDescriptor::supportes_lossless_compression() const noexcept
   {
-    return heif_encoder_descriptor_supports_lossless_compression(m_descriptor);
+    return !!heif_encoder_descriptor_supports_lossless_compression(m_descriptor);
   }
 
   inline bool EncoderDescriptor::supports_lossless_compression() const noexcept
   {
-    return heif_encoder_descriptor_supports_lossless_compression(m_descriptor);
+    return !!heif_encoder_descriptor_supports_lossless_compression(m_descriptor);
   }
 
   inline Encoder EncoderDescriptor::get_encoder() const
@@ -1124,7 +1128,8 @@ namespace heif {
       throw err;
     }
 
-    return have_minimum_maximum;
+	// fix warning C4800: Implicit conversion from 'int' to bool.
+	return !!have_minimum_maximum;
   }
 
   inline bool EncoderParameter::is_boolean() const noexcept
@@ -1217,7 +1222,8 @@ namespace heif {
     if (err) {
       throw err;
     }
-    return value;
+	// fix warning C4800: Implicit conversion from 'int' to bool.
+	return !!value;
   }
 
   inline void Encoder::set_string_parameter(const std::string& parameter_name, const std::string& value)
