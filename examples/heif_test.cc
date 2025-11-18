@@ -83,7 +83,7 @@ std::pair<heif_item_id, heif_item_id> parse_id_pair(const std::string& s)
 }
 
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
   std::vector<heif_item_id> image_IDs;
   std::vector<std::pair<heif_item_id, heif_item_id>> metadata_IDs; // first: image, second: metadata

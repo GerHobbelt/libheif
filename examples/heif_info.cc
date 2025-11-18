@@ -109,7 +109,7 @@ public:
 };
 
 
-int main(int argc, char** argv)
+int main(int argc, const char** argv)
 {
   // This takes care of initializing libheif and also deinitializing it at the end to free all resources.
   LibHeifInitializer initializer;
@@ -357,12 +357,12 @@ int main(int argc, char** argv)
 
     // --- depth information
 
-    bool has_depth = heif_image_handle_has_depth_image(handle);
-    bool has_alpha = heif_image_handle_has_alpha_channel(handle);
+    bool has_depth = !!heif_image_handle_has_depth_image(handle);
+    bool has_alpha = !!heif_image_handle_has_alpha_channel(handle);
     bool premultiplied_alpha = false;
 
     if (has_alpha) {
-      premultiplied_alpha = heif_image_handle_is_premultiplied_alpha(handle);
+      premultiplied_alpha = !!heif_image_handle_is_premultiplied_alpha(handle);
     }
 
     printf("  alpha channel: %s %s\n", has_alpha ? "yes" : "no",
